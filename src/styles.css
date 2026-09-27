@@ -954,3 +954,75 @@ tr.instance-row.slot-neighbor-next td:first-child {
 .slot-banner-close {
   padding: 2px 8px !important;
 }
+
+/* ---------- 冲突保留方案 ---------- */
+
+.ret-table th {
+  top: 33px;
+}
+
+.ret-weight {
+  width: 64px;
+  font-size: 12px;
+  padding: 2px 6px;
+  font-family: var(--mono);
+  color: var(--text);
+  background: #101725;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+}
+
+.ret-weight:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+tr.instance-row.ret-kept td:first-child {
+  box-shadow: inset 3px 0 0 var(--ok);
+}
+
+tr.instance-row.ret-dropped td {
+  color: var(--text-dim);
+}
+
+tr.instance-row.ret-dropped td:first-child {
+  box-shadow: inset 3px 0 0 var(--border-strong);
+}
+
+.ret-badge {
+  font-size: 11px;
+  padding: 1px 8px;
+  border-radius: 10px;
+  border: 1px solid var(--border-strong);
+  white-space: nowrap;
+}
+
+.ret-badge.keep {
+  color: var(--ok);
+  border-color: var(--ok);
+}
+
+.ret-badge.drop {
+  color: var(--excluded);
+}
+
+.ret-identity {
+  font-family: var(--mono);
+  font-size: 10px;
+  opacity: 0.75;
+  word-break: break-all;
+}
+
+.ret-pairs {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+
+.ret-pairs li {
+  margin-top: 2px;
+}
+
+.ret-footer {
+  padding: 8px 14px 12px;
+  border-top: 1px solid var(--border);
+}

@@ -1385,7 +1385,7 @@ var require_react_development = __commonJS({
           var dispatcher = resolveDispatcher();
           return dispatcher.useCallback(callback, deps);
         }
-        function useMemo5(create, deps) {
+        function useMemo6(create, deps) {
           var dispatcher = resolveDispatcher();
           return dispatcher.useMemo(create, deps);
         }
@@ -2157,7 +2157,7 @@ var require_react_development = __commonJS({
         exports2.useImperativeHandle = useImperativeHandle;
         exports2.useInsertionEffect = useInsertionEffect;
         exports2.useLayoutEffect = useLayoutEffect;
-        exports2.useMemo = useMemo5;
+        exports2.useMemo = useMemo6;
         exports2.useReducer = useReducer;
         exports2.useRef = useRef4;
         exports2.useState = useState5;
@@ -9570,7 +9570,7 @@ var require_react_dom_development = __commonJS({
         var HostPortal = 4;
         var HostComponent = 5;
         var HostText = 6;
-        var Fragment5 = 7;
+        var Fragment6 = 7;
         var Mode = 8;
         var ContextConsumer = 9;
         var ContextProvider = 10;
@@ -10726,7 +10726,7 @@ var require_react_dom_development = __commonJS({
               return "DehydratedFragment";
             case ForwardRef:
               return getWrappedName$1(type, type.render, "ForwardRef");
-            case Fragment5:
+            case Fragment6:
               return "Fragment";
             case HostComponent:
               return type;
@@ -19109,7 +19109,7 @@ var require_react_dom_development = __commonJS({
             }
           }
           function updateFragment2(returnFiber, current2, fragment, lanes, key) {
-            if (current2 === null || current2.tag !== Fragment5) {
+            if (current2 === null || current2.tag !== Fragment6) {
               var created = createFiberFromFragment(fragment, returnFiber.mode, lanes, key);
               created.return = returnFiber;
               return created;
@@ -19512,7 +19512,7 @@ var require_react_dom_development = __commonJS({
               if (child.key === key) {
                 var elementType = element.type;
                 if (elementType === REACT_FRAGMENT_TYPE) {
-                  if (child.tag === Fragment5) {
+                  if (child.tag === Fragment6) {
                     deleteRemainingChildren(returnFiber, child.sibling);
                     var existing = useFiber(child, element.props.children);
                     existing.return = returnFiber;
@@ -24987,7 +24987,7 @@ var require_react_dom_development = __commonJS({
               var _resolvedProps2 = workInProgress2.elementType === type ? _unresolvedProps2 : resolveDefaultProps(type, _unresolvedProps2);
               return updateForwardRef(current2, workInProgress2, type, _resolvedProps2, renderLanes2);
             }
-            case Fragment5:
+            case Fragment6:
               return updateFragment(current2, workInProgress2, renderLanes2);
             case Mode:
               return updateMode(current2, workInProgress2, renderLanes2);
@@ -25259,7 +25259,7 @@ var require_react_dom_development = __commonJS({
             case SimpleMemoComponent:
             case FunctionComponent:
             case ForwardRef:
-            case Fragment5:
+            case Fragment6:
             case Mode:
             case Profiler:
             case ContextConsumer:
@@ -29510,7 +29510,7 @@ var require_react_dom_development = __commonJS({
           return fiber;
         }
         function createFiberFromFragment(elements, mode, lanes, key) {
-          var fiber = createFiber(Fragment5, elements, key, mode);
+          var fiber = createFiber(Fragment6, elements, key, mode);
           fiber.lanes = lanes;
           return fiber;
         }
@@ -33152,11 +33152,11 @@ var require_react_jsx_runtime_development = __commonJS({
             return jsxWithValidation(type, props, key, false);
           }
         }
-        var jsx7 = jsxWithValidationDynamic;
-        var jsxs7 = jsxWithValidationStatic;
+        var jsx8 = jsxWithValidationDynamic;
+        var jsxs8 = jsxWithValidationStatic;
         exports2.Fragment = REACT_FRAGMENT_TYPE;
-        exports2.jsx = jsx7;
-        exports2.jsxs = jsxs7;
+        exports2.jsx = jsx8;
+        exports2.jsxs = jsxs8;
       })();
     }
   }
@@ -33176,12 +33176,12 @@ var require_jsx_runtime = __commonJS({
 
 // scripts/dom-check.ts
 var import_jsdom = require("jsdom");
-var import_react6 = __toESM(require_react(), 1);
+var import_react7 = __toESM(require_react(), 1);
 var import_client = __toESM(require_client(), 1);
 var import_test_utils = __toESM(require_test_utils(), 1);
 
 // src/App.tsx
-var import_react5 = __toESM(require_react(), 1);
+var import_react6 = __toESM(require_react(), 1);
 
 // node_modules/ical.js/dist/ical.js
 var Binary = class _Binary {
@@ -41789,7 +41789,7 @@ function SourceView({
 }
 
 // src/components/InstanceTable.tsx
-var import_react4 = __toESM(require_react(), 1);
+var import_react5 = __toESM(require_react(), 1);
 
 // src/utils/format.ts
 function pad(n) {
@@ -42505,8 +42505,311 @@ function slotKey(slot) {
   return `slot@${slot.startUtc}-${slot.endUtc}`;
 }
 
-// src/components/InstanceTable.tsx
+// src/components/RetentionPanel.tsx
+var import_react4 = __toESM(require_react(), 1);
+
+// src/ical-engine/retention.ts
+var DEFAULT_RETENTION_PREF = { weight: 1, must: false };
+function sanitizeWeight(w) {
+  if (w === void 0 || !Number.isFinite(w) || w < 0) return DEFAULT_RETENTION_PREF.weight;
+  return Math.floor(w);
+}
+function overlaps(aStart, aEnd, bStart, bEnd) {
+  return aStart < bEnd && bStart < aEnd;
+}
+function cmpIdentity(a, b) {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+function cmpItem(a, b) {
+  return a.inst.startUtc - b.inst.startUtc || a.inst.endUtc - b.inst.endUtc || cmpIdentity(a.identity, b.identity);
+}
+var EMPTY_SOLUTION = { must: 0, weight: 0, count: 0, ids: [], picks: [] };
+function better(a, b) {
+  if (a.must !== b.must) return a.must > b.must;
+  if (a.weight !== b.weight) return a.weight > b.weight;
+  if (a.count !== b.count) return a.count > b.count;
+  const n = Math.min(a.ids.length, b.ids.length);
+  for (let i = 0; i < n; i++) {
+    if (a.ids[i] !== b.ids[i]) return a.ids[i] < b.ids[i];
+  }
+  return a.ids.length < b.ids.length;
+}
+function extend2(sol, iv, index) {
+  const ids = [...sol.ids];
+  const at = ids.findIndex((id) => id > iv.item.identity);
+  ids.splice(at === -1 ? ids.length : at, 0, iv.item.identity);
+  return {
+    must: sol.must + (iv.item.must ? 1 : 0),
+    weight: sol.weight + iv.item.weight,
+    count: sol.count + 1,
+    ids,
+    picks: [...sol.picks, index]
+  };
+}
+function computeRetentionPlan(instances, location, prefs) {
+  const loc = location.trim();
+  const participants = [];
+  for (const inst of instances) {
+    if (inst.location.trim() !== loc) continue;
+    if (inst.endUtc <= inst.startUtc) continue;
+    const identity = instanceIdentity(inst);
+    const pref = prefs[identity];
+    participants.push({
+      inst,
+      identity,
+      weight: sanitizeWeight(pref?.weight),
+      must: pref?.must ?? false
+    });
+  }
+  participants.sort(cmpItem);
+  const musts = participants.filter((p) => p.must);
+  const mustConflicts = [];
+  for (let i = 0; i < musts.length; i++) {
+    for (let j = i + 1; j < musts.length; j++) {
+      const a = musts[i];
+      const b = musts[j];
+      if (overlaps(a.inst.startUtc, a.inst.endUtc, b.inst.startUtc, b.inst.endUtc)) {
+        mustConflicts.push({ a, b });
+      }
+    }
+  }
+  mustConflicts.sort(
+    (x, y) => cmpIdentity(x.a.identity, y.a.identity) || cmpIdentity(x.b.identity, y.b.identity)
+  );
+  if (mustConflicts.length > 0) {
+    return { location: loc, participants, mustConflicts, kept: [], dropped: [], totalWeight: 0 };
+  }
+  const candidates = participants.filter(
+    (p) => p.must || !musts.some(
+      (m) => overlaps(p.inst.startUtc, p.inst.endUtc, m.inst.startUtc, m.inst.endUtc)
+    )
+  );
+  const intervals = candidates.map((item) => ({ item, start: item.inst.startUtc, end: item.inst.endUtc })).sort((a, b) => a.end - b.end || a.start - b.start || cmpIdentity(a.item.identity, b.item.identity));
+  const n = intervals.length;
+  const prev = new Array(n);
+  for (let i = 0; i < n; i++) {
+    let lo = 0;
+    let hi = i - 1;
+    let ans = -1;
+    while (lo <= hi) {
+      const mid = lo + hi >> 1;
+      if (intervals[mid].end <= intervals[i].start) {
+        ans = mid;
+        lo = mid + 1;
+      } else {
+        hi = mid - 1;
+      }
+    }
+    prev[i] = ans;
+  }
+  const dp = [EMPTY_SOLUTION];
+  for (let i = 1; i <= n; i++) {
+    const skip = dp[i - 1];
+    const take = extend2(dp[prev[i - 1] + 1], intervals[i - 1], i - 1);
+    dp.push(better(take, skip) ? take : skip);
+  }
+  const keptSet = new Set(dp[n].picks.map((i) => intervals[i].item.identity));
+  const kept = participants.filter((p) => keptSet.has(p.identity));
+  const dropped = participants.filter((p) => !keptSet.has(p.identity));
+  const totalWeight = kept.reduce((sum, p) => sum + p.weight, 0);
+  return { location: loc, participants, mustConflicts, kept, dropped, totalWeight };
+}
+
+// src/components/RetentionPanel.tsx
 var import_jsx_runtime4 = __toESM(require_jsx_runtime(), 1);
+function RetentionPanel({
+  instances,
+  location,
+  onLocationChange,
+  prefs,
+  onPrefChange,
+  onResetPrefs,
+  selectedKey,
+  onSelect
+}) {
+  const locations = (0, import_react4.useMemo)(() => collectLocations(instances), [instances]);
+  const plan = (0, import_react4.useMemo)(
+    () => location ? computeRetentionPlan(instances, location, prefs) : null,
+    [instances, location, prefs]
+  );
+  const skippedZero = (0, import_react4.useMemo)(() => {
+    if (!location) return 0;
+    const loc = location.trim();
+    return instances.filter(
+      (i) => i.location.trim() === loc && i.endUtc <= i.startUtc
+    ).length;
+  }, [instances, location]);
+  const noSolution = !!plan && plan.mustConflicts.length > 0;
+  const keptSet = (0, import_react4.useMemo)(
+    () => new Set((plan && !noSolution ? plan.kept : []).map((k) => k.identity)),
+    [plan, noSolution]
+  );
+  return /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)(import_jsx_runtime4.Fragment, { children: [
+    /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: "filter-bar free-controls", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("label", { children: [
+        "LOCATION",
+        /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("select", { value: location, onChange: (e) => onLocationChange(e.target.value), children: [
+          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("option", { value: "", children: "\u8BF7\u9009\u62E9\u2026" }),
+          locations.map((loc) => /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("option", { value: loc, children: loc }, loc)),
+          location && !locations.includes(location) && /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("option", { value: location, children: [
+            location,
+            "\uFF08\u5F53\u524D\u8303\u56F4\u65E0\u5B9E\u4F8B\uFF09"
+          ] })
+        ] })
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { style: { flex: 1 } }),
+      plan && !noSolution && /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("span", { className: "clock", children: [
+        "\u4FDD\u7559 ",
+        /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("b", { style: { color: "var(--ok)" }, children: plan.kept.length }),
+        " \xB7 \u820D\u5F03",
+        " ",
+        /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("b", { style: { color: "var(--excluded)" }, children: plan.dropped.length }),
+        " \xB7 \u603B\u6743\u91CD",
+        " ",
+        /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("b", { style: { color: "var(--text)" }, children: plan.totalWeight })
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+        "button",
+        {
+          className: "ghost",
+          onClick: onResetPrefs,
+          disabled: Object.keys(prefs).length === 0,
+          title: "\u6E05\u9664\u5168\u90E8\u6743\u91CD\u4E0E\u5FC5\u7559\u8BBE\u7F6E\uFF08\u6062\u590D\u9ED8\u8BA4\u6743\u91CD 1\u3001\u975E\u5FC5\u7559\uFF09",
+          children: "\u91CD\u7F6E\u8BBE\u7F6E"
+        }
+      )
+    ] }),
+    !location ? /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: "empty-hint diff-empty", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { style: { fontSize: 28, marginBottom: 6 }, children: "\u2696\uFE0F" }),
+      "\u9009\u62E9 LOCATION \u540E\uFF0C\u4E3A\u8BE5\u5730\u70B9\u5F53\u524D\u8303\u56F4\u5185\u7684\u6B63\u65F6\u957F\u751F\u6548\u5B9E\u4F8B\u8BBE\u7F6E\u6743\u91CD\u4E0E\u5FC5\u7559\uFF0C \u8BA1\u7B97\u65E0\u91CD\u53E0\u4E14\u6743\u91CD\u603B\u548C\u6700\u5927\u7684\u4FDD\u7559\u65B9\u6848",
+      /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { className: "clock", style: { marginTop: 4 }, children: "\u4EC5\u9884\u89C8\uFF0C\u4E0D\u5199\u56DE\u65E5\u5386\uFF1B\u5DF2\u53D6\u6D88 / \u5DF2\u6392\u9664 / \u96F6\u65F6\u957F\u5B9E\u4F8B\u4E0D\u53C2\u4E0E" })
+    ] }) : plan ? /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)(import_jsx_runtime4.Fragment, { children: [
+      noSolution && /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: "free-msg error", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { children: [
+          "\u2715 \u5FC5\u7559\u5B9E\u4F8B\u4E92\u76F8\u91CD\u53E0\uFF0C\u65E0\u89E3\u2014\u2014\u8BF7\u8C03\u6574\u5FC5\u7559\u6807\u8BB0\u3002\u51B2\u7A81\u5BF9\uFF08",
+          plan.mustConflicts.length,
+          "\uFF09\uFF1A"
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("ul", { className: "ret-pairs", children: plan.mustConflicts.map((pair, idx) => /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("li", { children: [
+          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(InstanceLink, { item: pair.a, onSelect }),
+          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: "clock", children: " \u2194 " }),
+          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(InstanceLink, { item: pair.b, onSelect })
+        ] }, idx)) })
+      ] }),
+      skippedZero > 0 && /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: "free-msg warn", children: [
+        "\u26A0 ",
+        skippedZero,
+        " \u4E2A\u96F6\u65F6\u957F\u5B9E\u4F8B\u4E0D\u53C2\u4E0E\u4FDD\u7559\u65B9\u6848"
+      ] }),
+      plan.participants.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { className: "empty-hint", children: "\u8BE5\u5730\u70B9\u5728\u5F53\u524D\u8303\u56F4\u5185\u6CA1\u6709\u6B63\u65F6\u957F\u7684\u751F\u6548\u5B9E\u4F8B" }) : /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("table", { className: "instance-table ret-table", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("thead", { children: /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("tr", { children: [
+          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("th", { style: { width: 150 }, children: "\u5F00\u59CB\uFF08\u58F0\u660E\u65F6\u533A\u5899\u949F\uFF09" }),
+          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("th", { children: "\u4E8B\u4EF6" }),
+          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("th", { style: { width: 76 }, children: "\u6743\u91CD" }),
+          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("th", { style: { width: 48 }, children: "\u5FC5\u7559" }),
+          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("th", { style: { width: 64 }, children: "\u65B9\u6848" })
+        ] }) }),
+        /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("tbody", { children: plan.participants.map((item) => /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+          RetentionRow,
+          {
+            item,
+            noSolution,
+            kept: keptSet.has(item.identity),
+            selected: selectedKey === instanceId(item.inst),
+            onPrefChange,
+            onSelect
+          },
+          item.identity
+        )) })
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { className: "ret-footer clock", children: "\u65B9\u6848\u76EE\u6807\uFF1A\u5305\u542B\u5168\u90E8\u5FC5\u7559\u9879\u7684\u65E0\u91CD\u53E0\u5B50\u96C6\u4E2D\u6743\u91CD\u603B\u548C\u6700\u5927\uFF1B\u540C\u5206\u4FDD\u7559\u66F4\u591A\u5B9E\u4F8B\uFF0C \u518D\u6309 UID#recurrenceKey \u6807\u8BC6\u53D6\u5B57\u5178\u5E8F\u6700\u5C0F\u5217\u8868\u3002\u4EC5\u9884\u89C8\uFF0C\u4E0D\u4FEE\u6539\u65E5\u5386\u3002" })
+    ] }) : null
+  ] });
+}
+function RetentionRow({
+  item,
+  noSolution,
+  kept,
+  selected,
+  onPrefChange,
+  onSelect
+}) {
+  const { inst, identity } = item;
+  return /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)(
+    "tr",
+    {
+      className: [
+        "instance-row",
+        "ret-row",
+        noSolution ? "" : kept ? "ret-kept" : "ret-dropped",
+        selected ? "selected" : ""
+      ].join(" "),
+      onClick: () => onSelect(inst),
+      title: "\u70B9\u51FB\u5B9A\u4F4D ICS \u6E90\u7801",
+      children: [
+        /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("td", { className: "cell-time", children: [
+          formatWall(inst.startUtc, inst.tzid, inst.isAllDay),
+          !inst.isAllDay && /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)(import_jsx_runtime4.Fragment, { children: [
+            /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("br", {}),
+            /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("span", { className: "clock", children: [
+              "\u81F3 ",
+              formatWall(inst.endUtc, inst.tzid, false)
+            ] })
+          ] })
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("td", { children: [
+          inst.summary || /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("em", { style: { color: "var(--excluded)" }, children: "\uFF08\u65E0\u6807\u9898\uFF09" }),
+          item.must && /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: "tag range", style: { marginLeft: 6 }, title: "\u5FC5\u7559\uFF1A\u65B9\u6848\u5FC5\u987B\u5305\u542B\u8BE5\u5B9E\u4F8B", children: "\u5FC5\u7559" }),
+          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("br", {}),
+          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: "clock ret-identity", children: identity })
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("td", { onClick: (e) => e.stopPropagation(), children: /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+          "input",
+          {
+            type: "number",
+            className: "ret-weight",
+            min: 0,
+            step: 1,
+            value: item.weight,
+            title: "\u975E\u8D1F\u6574\u6570\u6743\u91CD\uFF0C\u9ED8\u8BA4 1",
+            onChange: (e) => {
+              const n = Number(e.target.value);
+              const weight = !Number.isFinite(n) || n < 0 ? 0 : Math.floor(n);
+              onPrefChange(identity, { weight });
+            }
+          }
+        ) }),
+        /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("td", { onClick: (e) => e.stopPropagation(), children: /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+          "input",
+          {
+            type: "checkbox",
+            checked: item.must,
+            title: "\u5FC5\u7559\uFF1A\u65B9\u6848\u5FC5\u987B\u5305\u542B\u8BE5\u5B9E\u4F8B\uFF1B\u5FC5\u7559\u9879\u4E92\u76F8\u91CD\u53E0\u5219\u65E0\u89E3",
+            onChange: (e) => onPrefChange(identity, { must: e.target.checked })
+          }
+        ) }),
+        /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("td", { children: noSolution ? /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: "clock", children: "\u2014" }) : kept ? /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: "ret-badge keep", children: "\u4FDD\u7559" }) : /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: "ret-badge drop", children: "\u820D\u5F03" }) })
+      ]
+    }
+  );
+}
+function InstanceLink({
+  item,
+  onSelect
+}) {
+  return /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+    "a",
+    {
+      style: { color: "var(--conflict)", cursor: "pointer" },
+      title: `${formatWall(item.inst.startUtc, item.inst.tzid, item.inst.isAllDay)} \xB7 \u70B9\u51FB\u5B9A\u4F4D\u6E90\u7801`,
+      onClick: () => onSelect(item.inst),
+      children: item.inst.summary || "\uFF08\u65E0\u6807\u9898\uFF09"
+    }
+  );
+}
+
+// src/components/InstanceTable.tsx
+var import_jsx_runtime5 = __toESM(require_jsx_runtime(), 1);
 var SOURCE_LABEL = {
   rrule: "RRULE",
   rdate: "RDATE",
@@ -42531,20 +42834,25 @@ function InstanceTable({
   freeEndDate,
   slotMark,
   onSelectSlot,
-  onDismissSlotMark
+  onDismissSlotMark,
+  retentionLocation,
+  onRetentionLocationChange,
+  retentionPrefs,
+  onRetentionPrefChange,
+  onRetentionReset
 }) {
-  const [locFilter, setLocFilter] = (0, import_react4.useState)("");
-  const [onlyConflicts, setOnlyConflicts] = (0, import_react4.useState)(false);
-  const rowRefs = (0, import_react4.useRef)(/* @__PURE__ */ new Map());
-  const conflicts = (0, import_react4.useMemo)(() => detectConflicts(instances), [instances]);
-  const rows = (0, import_react4.useMemo)(() => {
+  const [locFilter, setLocFilter] = (0, import_react5.useState)("");
+  const [onlyConflicts, setOnlyConflicts] = (0, import_react5.useState)(false);
+  const rowRefs = (0, import_react5.useRef)(/* @__PURE__ */ new Map());
+  const conflicts = (0, import_react5.useMemo)(() => detectConflicts(instances), [instances]);
+  const rows = (0, import_react5.useMemo)(() => {
     if (tab === "visible") return instances;
     if (tab === "cancelled") return cancelled;
     if (tab === "excluded") return excluded;
     return [];
   }, [tab, instances, cancelled, excluded]);
-  const filteredRows = (0, import_react4.useMemo)(() => {
-    if (tab === "impact" || tab === "free") return [];
+  const filteredRows = (0, import_react5.useMemo)(() => {
+    if (tab === "impact" || tab === "free" || tab === "retention") return [];
     const q = locFilter.trim().toLowerCase();
     return rows.filter((i) => {
       if (q && !i.location.toLowerCase().includes(q) && !i.summary.toLowerCase().includes(q)) {
@@ -42554,7 +42862,7 @@ function InstanceTable({
       return true;
     });
   }, [tab, rows, locFilter, onlyConflicts, conflicts]);
-  const visibleRows = (0, import_react4.useMemo)(() => {
+  const visibleRows = (0, import_react5.useMemo)(() => {
     if (tab !== "visible" || !ghostInstance) return filteredRows;
     if (instances.some((i) => instanceId(i) === instanceId(ghostInstance))) return filteredRows;
     const q = locFilter.trim().toLowerCase();
@@ -42564,51 +42872,59 @@ function InstanceTable({
     merged.sort((a, b) => a.startUtc - b.startUtc || a.uid.localeCompare(b.uid));
     return merged;
   }, [tab, filteredRows, instances, ghostInstance, locFilter, onlyConflicts]);
-  const baselineOffset = (0, import_react4.useMemo)(() => {
+  const baselineOffset = (0, import_react5.useMemo)(() => {
     const map = /* @__PURE__ */ new Map();
     for (const inst of instances) {
       if (!map.has(inst.seriesId)) map.set(inst.seriesId, inst.utcOffsetSec);
     }
     return map;
   }, [instances]);
-  (0, import_react4.useEffect)(() => {
+  (0, import_react5.useEffect)(() => {
     if (tab !== "visible" || !slotMark) return;
     const focus = slotMark.slot.prev ?? slotMark.slot.next;
     if (!focus) return;
     const el = rowRefs.current.get(instanceId(focus));
     el?.scrollIntoView?.({ block: "center", behavior: "smooth" });
   }, [tab, slotMark]);
-  return /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)(import_jsx_runtime4.Fragment, { children: [
-    /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: "tabs", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("button", { className: tab === "visible" ? "active" : "", onClick: () => onTabChange("visible"), children: [
+  return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(import_jsx_runtime5.Fragment, { children: [
+    /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "tabs", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("button", { className: tab === "visible" ? "active" : "", onClick: () => onTabChange("visible"), children: [
         "\u751F\u6548\u5B9E\u4F8B\uFF08",
         instances.length,
         "\uFF09"
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("button", { className: tab === "cancelled" ? "active" : "", onClick: () => onTabChange("cancelled"), children: [
+      /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("button", { className: tab === "cancelled" ? "active" : "", onClick: () => onTabChange("cancelled"), children: [
         "\u5DF2\u53D6\u6D88\uFF08",
         cancelled.length,
         "\uFF09"
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("button", { className: tab === "excluded" ? "active" : "", onClick: () => onTabChange("excluded"), children: [
+      /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("button", { className: tab === "excluded" ? "active" : "", onClick: () => onTabChange("excluded"), children: [
         "\u5DF2\u6392\u9664\uFF08",
         excluded.length,
         "\uFF09"
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("button", { className: tab === "free" ? "active" : "", onClick: () => onTabChange("free"), children: "\u7A7A\u95F2\u7A97\u53E3" }),
-      /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("button", { className: tab === "impact" ? "active" : "", onClick: () => onTabChange("impact"), children: [
+      /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("button", { className: tab === "free" ? "active" : "", onClick: () => onTabChange("free"), children: "\u7A7A\u95F2\u7A97\u53E3" }),
+      /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+        "button",
+        {
+          className: tab === "retention" ? "active" : "",
+          onClick: () => onTabChange("retention"),
+          children: "\u51B2\u7A81\u4FDD\u7559"
+        }
+      ),
+      /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("button", { className: tab === "impact" ? "active" : "", onClick: () => onTabChange("impact"), children: [
         "\u53D8\u66F4\u5F71\u54CD",
         changes.length > 0 ? `\uFF08${changes.length}\uFF09` : ""
       ] })
     ] }),
-    tab === "impact" ? /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+    tab === "impact" ? /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
       ChangeImpact,
       {
         changes,
         selectedIdentity,
         onSelectChange
       }
-    ) : tab === "free" ? /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+    ) : tab === "free" ? /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
       FreeWindows,
       {
         instances,
@@ -42624,10 +42940,22 @@ function InstanceTable({
           onSelect(inst);
         }
       }
-    ) : /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)(import_jsx_runtime4.Fragment, { children: [
-      tab === "visible" && slotMark && /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(SlotBanner, { mark: slotMark, onSelect, onDismiss: onDismissSlotMark }),
-      /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: "filter-bar", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+    ) : tab === "retention" ? /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+      RetentionPanel,
+      {
+        instances,
+        location: retentionLocation,
+        onLocationChange: onRetentionLocationChange,
+        prefs: retentionPrefs,
+        onPrefChange: onRetentionPrefChange,
+        onResetPrefs: onRetentionReset,
+        selectedKey,
+        onSelect
+      }
+    ) : /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(import_jsx_runtime5.Fragment, { children: [
+      tab === "visible" && slotMark && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(SlotBanner, { mark: slotMark, onSelect, onDismiss: onDismissSlotMark }),
+      /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "filter-bar", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
           "input",
           {
             type: "text",
@@ -42636,8 +42964,8 @@ function InstanceTable({
             onChange: (e) => setLocFilter(e.target.value)
           }
         ),
-        /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("label", { children: [
-          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("label", { children: [
+          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
             "input",
             {
               type: "checkbox",
@@ -42648,21 +42976,21 @@ function InstanceTable({
           ),
           "\u4EC5\u770B\u51B2\u7A81"
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { style: { flex: 1 } }),
-        /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("span", { style: { fontSize: 12, color: "var(--text-dim)" }, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { style: { flex: 1 } }),
+        /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("span", { style: { fontSize: 12, color: "var(--text-dim)" }, children: [
           "\u51B2\u7A81\u7EC4\uFF1A",
           conflicts.groups.length
         ] })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("table", { className: "instance-table", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("thead", { children: /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("tr", { children: [
-          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("th", { style: { width: 168 }, children: "\u5F00\u59CB\uFF08\u58F0\u660E\u65F6\u533A\u5899\u949F\uFF09" }),
-          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("th", { style: { width: 130 }, children: "\u5730\u70B9 / \u504F\u79FB" }),
-          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("th", { children: "\u4E8B\u4EF6" }),
-          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("th", { style: { width: 92 }, children: "\u6765\u6E90" })
+      /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("table", { className: "instance-table", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("thead", { children: /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("tr", { children: [
+          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("th", { style: { width: 168 }, children: "\u5F00\u59CB\uFF08\u58F0\u660E\u65F6\u533A\u5899\u949F\uFF09" }),
+          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("th", { style: { width: 130 }, children: "\u5730\u70B9 / \u504F\u79FB" }),
+          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("th", { children: "\u4E8B\u4EF6" }),
+          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("th", { style: { width: 92 }, children: "\u6765\u6E90" })
         ] }) }),
-        /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("tbody", { children: [
-          visibleRows.length === 0 && /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("tr", { children: /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("td", { colSpan: 4, className: "empty-hint", children: "\u8BE5\u89C6\u56FE\u4E0B\u6CA1\u6709\u5B9E\u4F8B" }) }),
+        /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("tbody", { children: [
+          visibleRows.length === 0 && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("tr", { children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("td", { colSpan: 4, className: "empty-hint", children: "\u8BE5\u89C6\u56FE\u4E0B\u6CA1\u6709\u5B9E\u4F8B" }) }),
           visibleRows.map((inst) => {
             const peers = conflicts.byKey.get(instanceId(inst));
             const id = instanceId(inst);
@@ -42670,7 +42998,7 @@ function InstanceTable({
             const dstChanged = inst.utcOffsetSec !== null && base !== void 0 && base !== null && inst.utcOffsetSec !== base;
             const isGhost = !!ghostInstance && id === instanceId(ghostInstance);
             const neighborTone = slotMark?.neighborKeys.has(id) ? slotMark.slot.prev && instanceId(slotMark.slot.prev) === id ? "prev" : "next" : void 0;
-            return /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)(
+            return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(
               "tr",
               {
                 ref: (el) => {
@@ -42689,15 +43017,15 @@ function InstanceTable({
                 onClick: () => onSelect(inst),
                 title: isGhost ? "\u8BE5\u5B9E\u4F8B\u5728\u5F53\u524D\u751F\u6548\u5217\u8868\u4E2D\u5DF2\u88AB\u79FB\u9664\uFF08\u6765\u81EA\u53D8\u66F4\u5F71\u54CD\u8054\u52A8\uFF09" : void 0,
                 children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("td", { className: "cell-time", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("td", { className: "cell-time", children: [
                     formatWall(inst.startUtc, inst.tzid, inst.isAllDay),
-                    !inst.isAllDay && /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)(import_jsx_runtime4.Fragment, { children: [
-                      /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("br", {}),
-                      /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("span", { className: "clock", children: [
+                    !inst.isAllDay && /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(import_jsx_runtime5.Fragment, { children: [
+                      /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("br", {}),
+                      /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("span", { className: "clock", children: [
                         "\u81F3 ",
                         formatWall(inst.endUtc, inst.tzid, false)
                       ] }),
-                      dstChanged && /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+                      dstChanged && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
                         "span",
                         {
                           className: "dst-note",
@@ -42707,14 +43035,14 @@ function InstanceTable({
                       )
                     ] })
                   ] }),
-                  /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("td", { className: "loc-cell", children: [
-                    inst.location.trim() ? inst.location : /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("em", { style: { color: "var(--excluded)" }, children: "\u65E0\u5730\u70B9" }),
-                    /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("br", {}),
-                    /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: "clock", children: inst.isAllDay ? "\u65E5\u671F\u578B\uFF08\u65E0\u65F6\u533A\uFF09" : formatOffset(inst.utcOffsetSec) })
+                  /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("td", { className: "loc-cell", children: [
+                    inst.location.trim() ? inst.location : /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("em", { style: { color: "var(--excluded)" }, children: "\u65E0\u5730\u70B9" }),
+                    /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("br", {}),
+                    /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: "clock", children: inst.isAllDay ? "\u65E5\u671F\u578B\uFF08\u65E0\u65F6\u533A\uFF09" : formatOffset(inst.utcOffsetSec) })
                   ] }),
-                  /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("td", { children: [
-                    inst.summary || /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("em", { style: { color: "var(--excluded)" }, children: "\uFF08\u65E0\u6807\u9898\uFF09" }),
-                    isGhost && /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+                  /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("td", { children: [
+                    inst.summary || /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("em", { style: { color: "var(--excluded)" }, children: "\uFF08\u65E0\u6807\u9898\uFF09" }),
+                    isGhost && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
                       "span",
                       {
                         className: "tag",
@@ -42723,7 +43051,7 @@ function InstanceTable({
                         children: "\u5DF2\u79FB\u9664"
                       }
                     ),
-                    inst.overrideDisabled && !isGhost && /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+                    inst.overrideDisabled && !isGhost && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
                       "span",
                       {
                         className: "tag",
@@ -42732,7 +43060,7 @@ function InstanceTable({
                         children: "\u4F8B\u5916\u5DF2\u505C\u7528"
                       }
                     ),
-                    inst.rangeOverride && /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+                    inst.rangeOverride && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
                       "span",
                       {
                         className: "tag range",
@@ -42741,14 +43069,14 @@ function InstanceTable({
                         children: "\u8303\u56F4\u4F8B\u5916"
                       }
                     ),
-                    inst.orphan && /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: "tag", style: { marginLeft: 6 }, children: "\u5B64\u7ACB\u8986\u76D6" }),
-                    peers && /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("span", { className: "conflict-chip", onClick: (e) => e.stopPropagation(), children: [
+                    inst.orphan && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: "tag", style: { marginLeft: 6 }, children: "\u5B64\u7ACB\u8986\u76D6" }),
+                    peers && /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("span", { className: "conflict-chip", onClick: (e) => e.stopPropagation(), children: [
                       "\u26A0 \u4E0E ",
                       peers.length,
                       " \u4E2A\u5B9E\u4F8B\u51B2\u7A81\uFF1A",
-                      peers.map((p, i) => /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("span", { children: [
+                      peers.map((p, i) => /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("span", { children: [
                         i > 0 ? "\u3001" : "",
-                        /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+                        /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
                           "a",
                           {
                             onClick: (e) => {
@@ -42762,9 +43090,9 @@ function InstanceTable({
                       ] }, instanceId(p)))
                     ] })
                   ] }),
-                  /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("td", { children: [
-                    /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: `src-badge ${inst.source}`, children: SOURCE_LABEL[inst.source] }),
-                    /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: "clock", style: { marginTop: 2 }, children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("td", { children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: `src-badge ${inst.source}`, children: SOURCE_LABEL[inst.source] }),
+                    /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "clock", style: { marginTop: 2 }, children: [
                       "\u884C ",
                       inst.originLine || "\u2014"
                     ] })
@@ -42785,10 +43113,10 @@ function SlotBanner({
   onDismiss
 }) {
   const { slot } = mark;
-  return /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: "slot-banner", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("span", { children: [
+  return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "slot-banner", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("span", { children: [
       "\u{1FA9F} \u7A7A\u6863 ",
-      /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("b", { children: slot.date }),
+      /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("b", { children: slot.date }),
       " ",
       formatWall(slot.startUtc, mark.tzid, false).slice(11),
       "\u2013",
@@ -42800,21 +43128,21 @@ function SlotBanner({
       formatOffset(slot.offsetSec),
       "\uFF09"
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { style: { flex: 1 } }),
-    slot.prev ? /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("button", { className: "ghost", onClick: () => onSelect(slot.prev), children: [
+    /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { style: { flex: 1 } }),
+    slot.prev ? /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("button", { className: "ghost", onClick: () => onSelect(slot.prev), children: [
       "\u5B9A\u4F4D\u524D\u90BB\uFF1A",
       slot.prev.summary || "\uFF08\u65E0\u6807\u9898\uFF09"
-    ] }) : /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: "clock", children: "\u65E0\u524D\u90BB" }),
-    slot.next ? /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("button", { className: "ghost", onClick: () => onSelect(slot.next), children: [
+    ] }) : /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: "clock", children: "\u65E0\u524D\u90BB" }),
+    slot.next ? /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("button", { className: "ghost", onClick: () => onSelect(slot.next), children: [
       "\u5B9A\u4F4D\u540E\u90BB\uFF1A",
       slot.next.summary || "\uFF08\u65E0\u6807\u9898\uFF09"
-    ] }) : /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: "clock", children: "\u65E0\u540E\u90BB" }),
-    /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("button", { className: "ghost slot-banner-close", onClick: onDismiss, title: "\u6E05\u9664\u5B9A\u4F4D\u6807\u8BB0", children: "\u2715" })
+    ] }) : /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: "clock", children: "\u65E0\u540E\u90BB" }),
+    /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("button", { className: "ghost slot-banner-close", onClick: onDismiss, title: "\u6E05\u9664\u5B9A\u4F4D\u6807\u8BB0", children: "\u2715" })
   ] });
 }
 
 // src/components/SeriesPanel.tsx
-var import_jsx_runtime5 = __toESM(require_jsx_runtime(), 1);
+var import_jsx_runtime6 = __toESM(require_jsx_runtime(), 1);
 function SeriesPanel({
   masters,
   disabledOverrides,
@@ -42829,50 +43157,50 @@ function SeriesPanel({
   onResetRrule
 }) {
   if (masters.length === 0) {
-    return /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "empty-hint", children: "\u89E3\u6790\u540E\u5728\u6B64\u663E\u793A\u91CD\u590D\u89C4\u5219\u4E0E\u4F8B\u5916" });
+    return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "empty-hint", children: "\u89E3\u6790\u540E\u5728\u6B64\u663E\u793A\u91CD\u590D\u89C4\u5219\u4E0E\u4F8B\u5916" });
   }
-  return /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { children: masters.map((m) => {
+  return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { children: masters.map((m) => {
     const edited = editedRrule[m.id];
     const isEdited = edited !== void 0;
     const shown = isEdited ? edited : m.rruleRaw;
     const err = rruleErrors[m.id];
-    return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(
+    return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
       "div",
       {
         className: "series-card",
         style: selectedSeriesId === m.id ? { boxShadow: "inset 3px 0 0 var(--accent)" } : void 0,
         children: [
-          /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "series-head", onClick: () => onFocusSeries(m), children: [
-            /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: "summary", children: m.summary || "\uFF08\u65E0\u6807\u9898\uFF09" }),
-            /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: "uid", children: m.uid })
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "series-head", onClick: () => onFocusSeries(m), children: [
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "summary", children: m.summary || "\uFF08\u65E0\u6807\u9898\uFF09" }),
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "uid", children: m.uid })
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "series-meta", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("span", { children: [
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "series-meta", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("span", { children: [
               "\u{1F4CD} ",
               m.location || "\u65E0\u5730\u70B9"
             ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("span", { children: [
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("span", { children: [
               "\u8D77 ",
               formatWall(Math.round(m.dtstart.toUnixTime()), tzidOf2(m), m.isAllDay)
             ] }),
-            m.rrule && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: "tag freq", children: freqOf(m) }),
-            !m.rrule && m.rdates.length === 0 && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: "tag", children: "\u5355\u6B21\u4E8B\u4EF6" }),
-            /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("span", { children: [
+            m.rrule && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "tag freq", children: freqOf(m) }),
+            !m.rrule && m.rdates.length === 0 && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "tag", children: "\u5355\u6B21\u4E8B\u4EF6" }),
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("span", { children: [
               m.overrides.length,
               " \u6761\u4F8B\u5916"
             ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("span", { children: [
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("span", { children: [
               m.exdates.length,
               " \u6761 EXDATE"
             ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("span", { children: [
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("span", { children: [
               m.rdates.length,
               " \u6761 RDATE"
             ] })
           ] }),
-          (m.rrule || isEdited) && /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "rrule-edit", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "row", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+          (m.rrule || isEdited) && /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "rrule-edit", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "row", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
                 "input",
                 {
                   type: "text",
@@ -42882,16 +43210,16 @@ function SeriesPanel({
                   onClick: (e) => e.stopPropagation()
                 }
               ),
-              isEdited && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("button", { onClick: () => onResetRrule(m.id), title: "\u6062\u590D\u539F\u6587", children: "\u91CD\u7F6E" })
+              isEdited && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("button", { onClick: () => onResetRrule(m.id), title: "\u6062\u590D\u539F\u6587", children: "\u91CD\u7F6E" })
             ] }),
-            err ? /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("span", { className: "rrule-error", children: [
+            err ? /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("span", { className: "rrule-error", children: [
               "\u2715 ",
               err
-            ] }) : isEdited ? /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: "rrule-ok", children: "\u2713 \u89C4\u5219\u5DF2\u751F\u6548\uFF0C\u5B9E\u4F8B\u5217\u8868\u5DF2\u5B9E\u65F6\u91CD\u7B97" }) : null
+            ] }) : isEdited ? /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "rrule-ok", children: "\u2713 \u89C4\u5219\u5DF2\u751F\u6548\uFF0C\u5B9E\u4F8B\u5217\u8868\u5DF2\u5B9E\u65F6\u91CD\u7B97" }) : null
           ] }),
-          m.rdates.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "rdates-list", children: [
+          m.rdates.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "rdates-list", children: [
             "RDATE\uFF1A",
-            m.rdates.map((r, i) => /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(
+            m.rdates.map((r, i) => /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
               "span",
               {
                 className: "wline",
@@ -42900,7 +43228,7 @@ function SeriesPanel({
                 children: [
                   formatWall(Math.round(r.time.toUnixTime()), tzidOf2(m), r.time.isDate),
                   r.end ? " (PERIOD)" : "",
-                  /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("sup", { children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("sup", { children: [
                     " L",
                     r.line
                   ] })
@@ -42909,11 +43237,11 @@ function SeriesPanel({
               i
             ))
           ] }),
-          m.exdates.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "exdates-list", children: [
+          m.exdates.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "exdates-list", children: [
             "EXDATE\uFF1A",
-            m.exdates.map((x, i) => /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("span", { style: { fontFamily: "var(--mono)", marginRight: 8 }, children: [
+            m.exdates.map((x, i) => /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("span", { style: { fontFamily: "var(--mono)", marginRight: 8 }, children: [
               formatWall(Math.round(x.time.toUnixTime()), tzidOf2(m), x.time.isDate),
-              /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("sup", { children: [
+              /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("sup", { children: [
                 " L",
                 x.line
               ] })
@@ -42921,15 +43249,15 @@ function SeriesPanel({
           ] }),
           m.overrides.map((ov) => {
             const off = disabledOverrides.has(ov.id);
-            return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(
+            return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
               "div",
               {
                 className: `override-item ${off ? "off" : ""}`,
                 style: selectedOverrideId === ov.id ? { outline: "1px solid var(--override)" } : void 0,
                 onClick: () => !off && onFocusOverride(ov),
                 children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: `dot ${ov.range ? "range" : ov.cancelled ? "cancelled" : "override"}` }),
-                  /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(
+                  /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: `dot ${ov.range ? "range" : ov.cancelled ? "cancelled" : "override"}` }),
+                  /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
                     "label",
                     {
                       className: "oi-main",
@@ -42940,7 +43268,7 @@ function SeriesPanel({
                       },
                       title: off ? "\u52FE\u9009\u4EE5\u91CD\u65B0\u542F\u7528\u8BE5\u4F8B\u5916" : ov.range ? "\u53D6\u6D88\u52FE\u9009\u4EE5\u505C\u7528\u8BE5\u8303\u56F4\u4F8B\u5916\uFF08\u53D7\u5F71\u54CD\u5B9E\u4F8B\u56DE\u5230\u524D\u4E00\u8303\u56F4\u72B6\u6001\uFF09" : "\u53D6\u6D88\u52FE\u9009\u4EE5\u505C\u7528\u8BE5\u4F8B\u5916\uFF08\u6062\u590D\u539F\u5B9E\u4F8B\uFF09",
                       children: [
-                        /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+                        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
                           "input",
                           {
                             type: "checkbox",
@@ -42954,14 +43282,14 @@ function SeriesPanel({
                         " \xB7",
                         " ",
                         formatWall(Math.round(ov.recurrenceId.toUnixTime()), tzidOf2(m), ov.isAllDay),
-                        ov.range && /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(import_jsx_runtime5.Fragment, { children: [
+                        ov.range && /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(import_jsx_runtime6.Fragment, { children: [
                           " \u8D77 \u2192 \u65B0\u8D77\u70B9 ",
                           formatWall(Math.round(ov.dtstart.toUnixTime()), tzidOf2(m), ov.isAllDay)
                         ] }),
                         " ",
                         "\xB7 ",
                         ov.summary,
-                        /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "oi-line", children: [
+                        /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "oi-line", children: [
                           "L",
                           ov.block.range.start,
                           "\u2013",
@@ -42996,7 +43324,7 @@ function tzidOf2(m) {
 }
 
 // src/App.tsx
-var import_jsx_runtime6 = __toESM(require_jsx_runtime(), 1);
+var import_jsx_runtime7 = __toESM(require_jsx_runtime(), 1);
 var EMPTY_SELECTION = {
   instanceKey: null,
   seriesId: null,
@@ -43005,19 +43333,21 @@ var EMPTY_SELECTION = {
   token: ""
 };
 function App() {
-  const [raw, setRaw] = (0, import_react5.useState)(SAMPLE_ICS);
-  const [outcome, setOutcome] = (0, import_react5.useState)(null);
-  const fileRef = (0, import_react5.useRef)(null);
+  const [raw, setRaw] = (0, import_react6.useState)(SAMPLE_ICS);
+  const [outcome, setOutcome] = (0, import_react6.useState)(null);
+  const fileRef = (0, import_react6.useRef)(null);
   const today = ymd(/* @__PURE__ */ new Date());
-  const [startDate, setStartDate] = (0, import_react5.useState)("2026-02-25");
-  const [endDate, setEndDate] = (0, import_react5.useState)("2026-04-15");
-  const [disabledOverrides, setDisabledOverrides] = (0, import_react5.useState)(/* @__PURE__ */ new Set());
-  const [editedRrule, setEditedRrule] = (0, import_react5.useState)({});
-  const [selection, setSelection] = (0, import_react5.useState)(EMPTY_SELECTION);
-  const [rightTab, setRightTab] = (0, import_react5.useState)("visible");
-  const [ghostInstance, setGhostInstance] = (0, import_react5.useState)(null);
-  const [slotMark, setSlotMark] = (0, import_react5.useState)(null);
-  const reparse = (0, import_react5.useCallback)((text) => {
+  const [startDate, setStartDate] = (0, import_react6.useState)("2026-02-25");
+  const [endDate, setEndDate] = (0, import_react6.useState)("2026-04-15");
+  const [disabledOverrides, setDisabledOverrides] = (0, import_react6.useState)(/* @__PURE__ */ new Set());
+  const [editedRrule, setEditedRrule] = (0, import_react6.useState)({});
+  const [selection, setSelection] = (0, import_react6.useState)(EMPTY_SELECTION);
+  const [rightTab, setRightTab] = (0, import_react6.useState)("visible");
+  const [ghostInstance, setGhostInstance] = (0, import_react6.useState)(null);
+  const [slotMark, setSlotMark] = (0, import_react6.useState)(null);
+  const [retentionLocation, setRetentionLocation] = (0, import_react6.useState)("");
+  const [retentionPrefs, setRetentionPrefs] = (0, import_react6.useState)({});
+  const reparse = (0, import_react6.useCallback)((text) => {
     const result = parseCalendar(text);
     let next;
     if ("fatal" in result) {
@@ -43036,49 +43366,51 @@ function App() {
     setSelection(EMPTY_SELECTION);
     setGhostInstance(null);
     setSlotMark(null);
+    setRetentionLocation("");
+    setRetentionPrefs({});
     return next;
   }, []);
-  const didInit = (0, import_react5.useRef)(false);
+  const didInit = (0, import_react6.useRef)(false);
   if (!didInit.current) {
     didInit.current = true;
     setOutcome(parseWith(SAMPLE_ICS));
   }
-  const range = (0, import_react5.useMemo)(() => {
+  const range = (0, import_react6.useMemo)(() => {
     const startUtc = localMidnightUtcSec(startDate);
     const endUtc = localMidnightUtcSec(addDays(endDate, 1));
     if (Number.isNaN(startUtc) || Number.isNaN(endUtc)) return null;
     return { startUtc, endUtc };
   }, [startDate, endDate]);
-  const expansion = (0, import_react5.useMemo)(() => {
+  const expansion = (0, import_react6.useMemo)(() => {
     if (!outcome?.ok || !range) return null;
     return expandAll(outcome.masters, range, { disabledOverrides, editedRrule });
   }, [outcome, range, disabledOverrides, editedRrule]);
-  const baseline = (0, import_react5.useMemo)(() => {
+  const baseline = (0, import_react6.useMemo)(() => {
     if (!outcome?.ok || !range) return null;
     return expandAll(outcome.masters, range, {
       disabledOverrides: /* @__PURE__ */ new Set(),
       editedRrule: {}
     });
   }, [outcome, range]);
-  (0, import_react5.useEffect)(() => {
+  (0, import_react6.useEffect)(() => {
     setGhostInstance(null);
     setSlotMark(null);
   }, [startDate, endDate]);
-  const changes = (0, import_react5.useMemo)(() => {
+  const changes = (0, import_react6.useMemo)(() => {
     if (!baseline || !expansion) return [];
     return diffInstances(baseline.instances, expansion.instances);
   }, [baseline, expansion]);
-  const conflicts = (0, import_react5.useMemo)(
+  const conflicts = (0, import_react6.useMemo)(
     () => expansion ? detectConflicts(expansion.instances) : null,
     [expansion]
   );
-  const allWarnings = (0, import_react5.useMemo)(() => {
+  const allWarnings = (0, import_react6.useMemo)(() => {
     if (!outcome) return [];
     const base = outcome.warnings;
     const extra = expansion?.warnings ?? [];
     return [...base, ...extra];
   }, [outcome, expansion]);
-  const selectedInstance = (0, import_react5.useMemo)(() => {
+  const selectedInstance = (0, import_react6.useMemo)(() => {
     if (!selection.instanceKey) return null;
     const find = (list) => list.find((i) => instanceId(i) === selection.instanceKey);
     if (expansion) {
@@ -43087,14 +43419,14 @@ function App() {
     }
     return baseline ? find(baseline.instances) ?? find(baseline.cancelled) ?? find(baseline.excluded) ?? null : null;
   }, [expansion, baseline, selection]);
-  const activeGhost = (0, import_react5.useMemo)(() => {
+  const activeGhost = (0, import_react6.useMemo)(() => {
     if (!ghostInstance || !expansion || !baseline) return ghostInstance;
     if (expansion.instances.some((i) => instanceId(i) === instanceId(ghostInstance))) return null;
     if (!baseline.instances.some((i) => instanceId(i) === instanceId(ghostInstance))) return null;
     return ghostInstance;
   }, [ghostInstance, expansion, baseline]);
   const selectedIdentity = selectedInstance ? instanceIdentity(selectedInstance) : null;
-  const selectInstance = (0, import_react5.useCallback)(
+  const selectInstance = (0, import_react6.useCallback)(
     (inst, ghost = null) => {
       const peers = conflicts?.byKey.get(instanceId(inst)) ?? [];
       setGhostInstance(ghost);
@@ -43113,7 +43445,7 @@ function App() {
     },
     [conflicts]
   );
-  const selectChange = (0, import_react5.useCallback)(
+  const selectChange = (0, import_react6.useCallback)(
     (change) => {
       if (change.after) {
         setRightTab("visible");
@@ -43125,7 +43457,7 @@ function App() {
     },
     [selectInstance]
   );
-  const selectFreeSlot = (0, import_react5.useCallback)((slot, tzid) => {
+  const selectFreeSlot = (0, import_react6.useCallback)((slot, tzid) => {
     const focus = slot.prev ?? slot.next;
     const neighborKeys = /* @__PURE__ */ new Set();
     if (slot.prev) neighborKeys.add(instanceId(slot.prev));
@@ -43148,7 +43480,7 @@ function App() {
       });
     }
   }, [conflicts]);
-  const focusSeries = (0, import_react5.useCallback)((m) => {
+  const focusSeries = (0, import_react6.useCallback)((m) => {
     setSelection({
       instanceKey: null,
       seriesId: m.id,
@@ -43157,7 +43489,7 @@ function App() {
       token: `series-${m.id}-${Date.now()}`
     });
   }, []);
-  const focusOverride = (0, import_react5.useCallback)((ov) => {
+  const focusOverride = (0, import_react6.useCallback)((ov) => {
     setSelection((prev) => ({
       instanceKey: prev.instanceKey,
       seriesId: ov.id.split("#")[0],
@@ -43166,7 +43498,7 @@ function App() {
       token: `ov-${ov.id}`
     }));
   }, []);
-  const toggleOverride = (0, import_react5.useCallback)((id) => {
+  const toggleOverride = (0, import_react6.useCallback)((id) => {
     setDisabledOverrides((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
@@ -43174,16 +43506,27 @@ function App() {
       return next;
     });
   }, []);
-  const editRrule = (0, import_react5.useCallback)((seriesId, value) => {
+  const editRrule = (0, import_react6.useCallback)((seriesId, value) => {
     setEditedRrule((prev) => ({ ...prev, [seriesId]: value }));
   }, []);
-  const resetRrule = (0, import_react5.useCallback)((seriesId) => {
+  const resetRrule = (0, import_react6.useCallback)((seriesId) => {
     setEditedRrule((prev) => {
       const next = { ...prev };
       delete next[seriesId];
       return next;
     });
   }, []);
+  const changeRetentionPref = (0, import_react6.useCallback)((identity, patch) => {
+    setRetentionPrefs((prev) => {
+      const cur = prev[identity] ?? { weight: 1, must: false };
+      const merged = { ...cur, ...patch };
+      const next = { ...prev };
+      if (merged.weight === 1 && !merged.must) delete next[identity];
+      else next[identity] = merged;
+      return next;
+    });
+  }, []);
+  const resetRetentionPrefs = (0, import_react6.useCallback)(() => setRetentionPrefs({}), []);
   const onImportFile = (file) => {
     const reader = new FileReader();
     reader.onload = () => {
@@ -43203,7 +43546,7 @@ function App() {
     const { ics } = normalizeCalendar(outcome, { disabledOverrides, editedRrule });
     await navigator.clipboard.writeText(ics);
   };
-  const sourceProps = (0, import_react5.useMemo)(() => {
+  const sourceProps = (0, import_react6.useMemo)(() => {
     if (!selectedInstance) return {};
     return {
       masterRange: selectedInstance.masterRange,
@@ -43212,7 +43555,7 @@ function App() {
       highlightRanges: selection.conflictRanges
     };
   }, [selectedInstance, selection]);
-  const seriesSourceProps = (0, import_react5.useMemo)(() => {
+  const seriesSourceProps = (0, import_react6.useMemo)(() => {
     if (!outcome?.ok || !selection.seriesId) return {};
     const m = outcome.masters.find((x) => x.id === selection.seriesId);
     if (!m) return {};
@@ -43226,13 +43569,13 @@ function App() {
   }, [outcome, selection]);
   const logicalLines = outcome?.logicalLines ?? raw.replace(/\r\n/g, "\n").split("\n");
   const activeSource = selectedInstance ? sourceProps : seriesSourceProps;
-  return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "app", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("header", { className: "app-header", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("h1", { children: "\u{1F4C5} iCalendar \u91CD\u590D\u65E5\u7A0B\u6821\u9A8C\u53F0" }),
-      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "sub", children: "\u672C\u5730\u8FD0\u884C \xB7 DTSTART / RRULE / RDATE / EXDATE / RECURRENCE-ID \u5C55\u5F00\u4E0E\u6821\u9A8C" }),
-      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "spacer" }),
-      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("button", { onClick: () => fileRef.current?.click(), children: "\u5BFC\u5165 .ics" }),
-      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "app", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("header", { className: "app-header", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("h1", { children: "\u{1F4C5} iCalendar \u91CD\u590D\u65E5\u7A0B\u6821\u9A8C\u53F0" }),
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "sub", children: "\u672C\u5730\u8FD0\u884C \xB7 DTSTART / RRULE / RDATE / EXDATE / RECURRENCE-ID \u5C55\u5F00\u4E0E\u6821\u9A8C" }),
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "spacer" }),
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("button", { onClick: () => fileRef.current?.click(), children: "\u5BFC\u5165 .ics" }),
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
         "input",
         {
           ref: fileRef,
@@ -43246,21 +43589,21 @@ function App() {
           }
         }
       ),
-      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("button", { onClick: () => {
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("button", { onClick: () => {
         setRaw(SAMPLE_ICS);
         reparse(SAMPLE_ICS);
       }, children: "\u8F7D\u5165\u793A\u4F8B" }),
-      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("button", { onClick: () => setRaw(""), children: "\u6E05\u7A7A" }),
-      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("button", { className: "primary", onClick: onExport, disabled: !outcome?.ok, children: "\u5BFC\u51FA\u89C4\u8303\u5316 ICS" }),
-      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("button", { className: "ghost", onClick: onCopyExport, disabled: !outcome?.ok, children: "\u590D\u5236 ICS" })
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("button", { onClick: () => setRaw(""), children: "\u6E05\u7A7A" }),
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("button", { className: "primary", onClick: onExport, disabled: !outcome?.ok, children: "\u5BFC\u51FA\u89C4\u8303\u5316 ICS" }),
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("button", { className: "ghost", onClick: onCopyExport, disabled: !outcome?.ok, children: "\u590D\u5236 ICS" })
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "main", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("section", { className: "pane", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "pane-title", children: "ICS \u8F93\u5165 / \u539F\u59CB\u884C\u5B9A\u4F4D" }),
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "input-toolbar", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("button", { className: "primary", onClick: () => reparse(raw), children: "\u89E3\u6790\u5E76\u5C55\u5F00" }),
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { style: { flex: 1 } }),
-          outcome && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+    /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "main", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("section", { className: "pane", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "pane-title", children: "ICS \u8F93\u5165 / \u539F\u59CB\u884C\u5B9A\u4F4D" }),
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "input-toolbar", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("button", { className: "primary", onClick: () => reparse(raw), children: "\u89E3\u6790\u5E76\u5C55\u5F00" }),
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { style: { flex: 1 } }),
+          outcome && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
             "span",
             {
               className: outcome.ok ? "rrule-ok" : "rrule-error",
@@ -43269,7 +43612,7 @@ function App() {
             }
           )
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
           "textarea",
           {
             className: "ics-input",
@@ -43279,18 +43622,18 @@ function App() {
             placeholder: "\u5728\u6B64\u7C98\u8D34 BEGIN:VCALENDAR \u2026\u2026"
           }
         ),
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "range-bar", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("b", { children: "\u5C55\u5F00\u8303\u56F4" }),
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("label", { children: [
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "range-bar", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("b", { children: "\u5C55\u5F00\u8303\u56F4" }),
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("label", { children: [
             "\u8D77 ",
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("input", { type: "date", value: startDate, onChange: (e) => setStartDate(e.target.value) })
+            /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("input", { type: "date", value: startDate, onChange: (e) => setStartDate(e.target.value) })
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("label", { children: [
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("label", { children: [
             "\u6B62 ",
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("input", { type: "date", value: endDate, onChange: (e) => setEndDate(e.target.value) })
+            /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("input", { type: "date", value: endDate, onChange: (e) => setEndDate(e.target.value) })
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("span", { className: "range-presets", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("span", { className: "range-presets", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
               "button",
               {
                 onClick: () => {
@@ -43300,7 +43643,7 @@ function App() {
                 children: "\u8FD1 3 \u6708"
               }
             ),
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+            /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
               "button",
               {
                 onClick: () => {
@@ -43311,36 +43654,36 @@ function App() {
               }
             )
           ] }),
-          range && range.startUtc >= range.endUtc && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "rrule-error", style: { fontSize: 12 }, children: "\u8D77\u59CB\u65E5\u671F\u5FC5\u987B\u65E9\u4E8E\u7ED3\u675F\u65E5\u671F" }),
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "spacer", style: { flex: 1 } }),
-          expansion && /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("span", { className: "stats", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("span", { children: [
+          range && range.startUtc >= range.endUtc && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "rrule-error", style: { fontSize: 12 }, children: "\u8D77\u59CB\u65E5\u671F\u5FC5\u987B\u65E9\u4E8E\u7ED3\u675F\u65E5\u671F" }),
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "spacer", style: { flex: 1 } }),
+          expansion && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("span", { className: "stats", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("span", { children: [
               "\u751F\u6548 ",
-              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("b", { children: expansion.instances.length })
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("b", { children: expansion.instances.length })
             ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("span", { children: [
+            /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("span", { children: [
               "\u53D6\u6D88 ",
-              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("b", { children: expansion.cancelled.length })
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("b", { children: expansion.cancelled.length })
             ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("span", { children: [
+            /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("span", { children: [
               "\u6392\u9664 ",
-              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("b", { children: expansion.excluded.length })
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("b", { children: expansion.excluded.length })
             ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("span", { children: [
+            /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("span", { children: [
               "\u51B2\u7A81\u7EC4 ",
-              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("b", { style: { color: "var(--conflict)" }, children: conflicts?.groups.length ?? 0 })
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("b", { style: { color: "var(--conflict)" }, children: conflicts?.groups.length ?? 0 })
             ] }),
-            changes.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("span", { children: [
+            changes.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("span", { children: [
               "\u53D8\u66F4\u5F71\u54CD",
               " ",
-              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("b", { style: { color: "var(--warn)", cursor: "pointer" }, onClick: () => setRightTab("impact"), children: changes.length })
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("b", { style: { color: "var(--warn)", cursor: "pointer" }, onClick: () => setRightTab("impact"), children: changes.length })
             ] })
           ] })
         ] }),
-        allWarnings.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "warnings", children: allWarnings.map((w) => /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "warning-item", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: `wlevel ${w.level}`, children: w.level === "error" ? "\u9519\u8BEF" : w.level === "warn" ? "\u8B66\u544A" : "\u63D0\u793A" }),
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { children: w.text }),
-          w.line && /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
+        allWarnings.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "warnings", children: allWarnings.map((w) => /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "warning-item", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: `wlevel ${w.level}`, children: w.level === "error" ? "\u9519\u8BEF" : w.level === "warn" ? "\u8B66\u544A" : "\u63D0\u793A" }),
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { children: w.text }),
+          w.line && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
             "span",
             {
               className: "wline",
@@ -43357,7 +43700,7 @@ function App() {
             }
           )
         ] }, w.id)) }),
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
           SourceView,
           {
             lines: logicalLines,
@@ -43367,9 +43710,9 @@ function App() {
           }
         )
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("section", { className: "pane", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "pane-title", children: "\u91CD\u590D\u89C4\u5219 / \u4F8B\u5916\u7BA1\u7406" }),
-        outcome?.ok ? /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("section", { className: "pane", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "pane-title", children: "\u91CD\u590D\u89C4\u5219 / \u4F8B\u5916\u7BA1\u7406" }),
+        outcome?.ok ? /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
           SeriesPanel,
           {
             masters: outcome.masters,
@@ -43384,11 +43727,11 @@ function App() {
             onEditRrule: editRrule,
             onResetRrule: resetRrule
           }
-        ) : /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "empty-hint", children: outcome && !outcome.ok ? outcome.fatal : "\u70B9\u51FB\u201C\u89E3\u6790\u5E76\u5C55\u5F00\u201D\u5F00\u59CB\u6821\u9A8C" })
+        ) : /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "empty-hint", children: outcome && !outcome.ok ? outcome.fatal : "\u70B9\u51FB\u201C\u89E3\u6790\u5E76\u5C55\u5F00\u201D\u5F00\u59CB\u6821\u9A8C" })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("section", { className: "pane", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "pane-title", children: "\u5B9E\u4F8B\u5217\u8868 / LOCATION \u51B2\u7A81" }),
-        expansion ? /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("section", { className: "pane", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "pane-title", children: "\u5B9E\u4F8B\u5217\u8868 / LOCATION \u51B2\u7A81" }),
+        expansion ? /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
           InstanceTable,
           {
             instances: expansion.instances,
@@ -43408,9 +43751,14 @@ function App() {
             freeEndDate: endDate,
             slotMark,
             onSelectSlot: selectFreeSlot,
-            onDismissSlotMark: () => setSlotMark(null)
+            onDismissSlotMark: () => setSlotMark(null),
+            retentionLocation,
+            onRetentionLocationChange: setRetentionLocation,
+            retentionPrefs,
+            onRetentionPrefChange: changeRetentionPref,
+            onRetentionReset: resetRetentionPrefs
           }
-        ) : /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "empty-hint", children: outcome && !outcome.ok ? "\u89E3\u6790\u5931\u8D25\uFF0C\u8BF7\u4FEE\u6B63\u5DE6\u4FA7\u8F93\u5165" : "\u6682\u65E0\u5C55\u5F00\u7ED3\u679C" })
+        ) : /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "empty-hint", children: outcome && !outcome.ok ? "\u89E3\u6790\u5931\u8D25\uFF0C\u8BF7\u4FEE\u6B63\u5DE6\u4FA7\u8F93\u5165" : "\u6682\u65E0\u5C55\u5F00\u7ED3\u679C" })
       ] })
     ] })
   ] });
@@ -43447,7 +43795,7 @@ function parseWith(text) {
   const container = document.getElementById("root");
   const root = (0, import_client.createRoot)(container);
   await (0, import_test_utils.act)(async () => {
-    root.render(import_react6.default.createElement(App));
+    root.render(import_react7.default.createElement(App));
   });
   const byText = (sel, text) => [...container.querySelectorAll(sel)].find((el) => el.textContent?.includes(text)) ?? null;
   const impactTab = byText("button", "\u53D8\u66F4\u5F71\u54CD");
@@ -43543,6 +43891,71 @@ function parseWith(text) {
     throw new Error("\u91CD\u65B0\u542F\u7528\u8303\u56F4\u4F8B\u5916\u540E\u5DEE\u5F02\u5E94\u6E05\u7A7A");
   }
   console.log("\u2713 \u91CD\u65B0\u542F\u7528\u8303\u56F4\u4F8B\u5916\u540E\u5DEE\u5F02\u6E05\u7A7A\uFF08\u56DE\u5230\u8303\u56F4\u72B6\u6001\uFF09");
+  const retentionTab = byText(".tabs button", "\u51B2\u7A81\u4FDD\u7559");
+  if (!retentionTab) throw new Error("\u51B2\u7A81\u4FDD\u7559 \u9875\u7B7E\u672A\u6E32\u67D3");
+  await (0, import_test_utils.act)(async () => {
+    retentionTab.click();
+  });
+  if (!container.textContent?.includes("\u9009\u62E9 LOCATION \u540E")) {
+    throw new Error("\u672A\u9009 LOCATION \u65F6\u5E94\u663E\u793A\u7A7A\u72B6\u6001\u63D0\u793A");
+  }
+  console.log("\u2713 \u51B2\u7A81\u4FDD\u7559\u9875\u7B7E\u6E32\u67D3\u7A7A\u72B6\u6001");
+  const retSelect = container.querySelector(".free-controls select");
+  if (!retSelect) throw new Error("\u627E\u4E0D\u5230\u4FDD\u7559\u65B9\u6848 LOCATION \u4E0B\u62C9");
+  const selectSetter = Object.getOwnPropertyDescriptor(
+    dom.window.HTMLSelectElement.prototype,
+    "value"
+  ).set;
+  await (0, import_test_utils.act)(async () => {
+    selectSetter.call(retSelect, "\u4F1A\u8BAE\u5BA4 A");
+    retSelect.dispatchEvent(new dom.window.Event("change", { bubbles: true }));
+  });
+  const retRows = () => container.querySelectorAll("tr.ret-row");
+  if (retRows().length === 0) throw new Error("\u9009\u62E9 LOCATION \u540E\u5E94\u5217\u51FA\u53C2\u4E0E\u5B9E\u4F8B");
+  const dropBadges = () => container.querySelectorAll(".ret-badge.drop");
+  const keepBadges = () => container.querySelectorAll(".ret-badge.keep");
+  if (dropBadges().length !== 4) throw new Error(`\u9ED8\u8BA4\u65B9\u6848\u5E94\u820D\u5F03 4 \u4E2A\u5B9E\u4F8B\uFF0C\u5B9E\u9645 ${dropBadges().length}`);
+  if (keepBadges().length !== retRows().length - 4) throw new Error("\u4FDD\u7559\u6570\u5E94\u4E3A\u53C2\u4E0E\u6570\u51CF\u820D\u5F03\u6570");
+  if (!container.textContent?.includes("\u603B\u6743\u91CD")) throw new Error("\u5E94\u5C55\u793A\u603B\u6743\u91CD");
+  console.log(`\u2713 \u9ED8\u8BA4\u65B9\u6848\uFF1A\u53C2\u4E0E ${retRows().length}\uFF0C\u4FDD\u7559 ${keepBadges().length}\uFF0C\u820D\u5F03 ${dropBadges().length}`);
+  const firstDropped = dropBadges()[0].closest("tr");
+  const mustCb = firstDropped.querySelector('input[type="checkbox"]');
+  await (0, import_test_utils.act)(async () => {
+    mustCb.click();
+  });
+  if (!firstDropped.querySelector(".ret-badge.keep")) throw new Error("\u5FC5\u7559\u5B9E\u4F8B\u5E94\u8F6C\u4E3A\u4FDD\u7559");
+  if (!firstDropped.textContent?.includes("\u5FC5\u7559")) throw new Error("\u5FC5\u7559\u5B9E\u4F8B\u5E94\u6807\u6CE8\u300C\u5FC5\u7559\u300D");
+  console.log("\u2713 \u5FC5\u7559\u6807\u8BB0\u7ACB\u5373\u91CD\u7B97\uFF1A\u88AB\u820D\u5F03\u5B9E\u4F8B\u8F6C\u4E3A\u4FDD\u7559");
+  const secondDropped = container.querySelector("tr.ret-dropped");
+  if (!secondDropped) throw new Error("\u5E94\u5B58\u5728\u88AB\u5FC5\u7559\u6324\u6389\u7684\u5B9E\u4F8B");
+  const mustCb2 = secondDropped.querySelector('input[type="checkbox"]');
+  await (0, import_test_utils.act)(async () => {
+    mustCb2.click();
+  });
+  if (!container.textContent?.includes("\u65E0\u89E3")) throw new Error("\u5FC5\u7559\u4E92\u76F8\u91CD\u53E0\u65F6\u5E94\u63D0\u793A\u65E0\u89E3");
+  if (!container.textContent?.includes("\u51B2\u7A81\u5BF9")) throw new Error("\u5E94\u5217\u51FA\u5FC5\u7559\u51B2\u7A81\u5BF9");
+  if (container.querySelector(".ret-badge.keep")) throw new Error("\u65E0\u89E3\u65F6\u4E0D\u5E94\u8F93\u51FA\u4FDD\u7559\u65B9\u6848");
+  console.log("\u2713 \u5FC5\u7559\u51B2\u7A81\u5BF9\u5C55\u793A\u5E76\u65E0\u89E3\uFF08\u4E0D\u8F93\u51FA\u65B9\u6848\uFF09");
+  await (0, import_test_utils.act)(async () => {
+    mustCb2.click();
+  });
+  if (container.textContent?.includes("\u65E0\u89E3")) throw new Error("\u53D6\u6D88\u5FC5\u7559\u540E\u5E94\u6062\u590D\u6709\u89E3");
+  if (!container.querySelector(".ret-badge.keep")) throw new Error("\u6062\u590D\u540E\u5E94\u91CD\u65B0\u8F93\u51FA\u4FDD\u7559\u65B9\u6848");
+  console.log("\u2713 \u53D6\u6D88\u5FC5\u7559\u540E\u65B9\u6848\u7ACB\u5373\u6062\u590D");
+  const firstRetRow = retRows()[0];
+  await (0, import_test_utils.act)(async () => {
+    firstRetRow.click();
+  });
+  if (!container.querySelector("tr.ret-row.selected")) throw new Error("\u70B9\u51FB\u5B9E\u4F8B\u884C\u5E94\u9009\u4E2D\u5E76\u5B9A\u4F4D\u6E90\u7801");
+  console.log("\u2713 \u70B9\u51FB\u4FDD\u7559\u65B9\u6848\u5B9E\u4F8B\u8054\u52A8\u6E90\u7801\u5B9A\u4F4D");
+  const loadSampleBtn = byText("button", "\u8F7D\u5165\u793A\u4F8B");
+  await (0, import_test_utils.act)(async () => {
+    loadSampleBtn.click();
+  });
+  if (!container.textContent?.includes("\u9009\u62E9 LOCATION \u540E")) {
+    throw new Error("\u91CD\u65B0\u89E3\u6790\u540E\u4FDD\u7559\u65B9\u6848\u8BBE\u7F6E\u5E94\u91CD\u7F6E");
+  }
+  console.log("\u2713 \u91CD\u65B0\u89E3\u6790\u540E\u4FDD\u7559\u65B9\u6848\u8BBE\u7F6E\u91CD\u7F6E");
   root.unmount();
   console.log("\u2713 DOM \u96C6\u6210\u9A8C\u8BC1\u5168\u90E8\u901A\u8FC7");
   process.exit(0);

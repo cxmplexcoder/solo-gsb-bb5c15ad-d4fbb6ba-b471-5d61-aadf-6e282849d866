@@ -6,6 +6,7 @@ import { diffInstances, instanceIdentity } from './ical-engine/diff';
 import type { InstanceChange } from './ical-engine/diff';
 import { normalizeCalendar } from './ical-engine/normalizer';
 import { SAMPLE_ICS } from './ical-engine/samples';
+import type { RetentionPref } from './ical-engine/retention';
 import type {
   Instance,
   MasterSeries,
@@ -60,6 +61,9 @@ export default function App() {
   const [ghostInstance, setGhostInstance] = useState<Instance | null>(null);
   /** 空闲窗口联动：点击空档后在生效表高亮/定位前后相邻事件 */
   const [slotMark, setSlotMark] = useState<SlotMark | null>(null);
+  /** 冲突保留方案：选中的 LOCATION 与按 uid#recurrenceKey 标识保存的权重/必留设置 */
+  const [retentionLocation, setRetentionLocation] = useState('');
+  const [retentionPrefs, setRetentionPrefs] = useState<Record<string, RetentionPref>>({});
 
   const reparse = useCallback((text: string): ParseOutcome => {
     const result = parseCalendar(text);
@@ -80,6 +84,8 @@ export default function App() {
     setSelection(EMPTY_SELECTION);
     setGhostInstance(null);
     setSlotMark(null);
+    setRetentionLocation('');
+    setRetentionPrefs({});
     return next;
   }, []);
 
@@ -263,6 +269,21 @@ export default function App() {
       return next;
     });
   }, []);
+
+  // 冲突保留方案：权重 / 必留按 uid#recurrenceKey 标识保存；
+  // 恢复默认值（权重 1、非必留）时移除条目，保持设置表精简
+  const changeRetentionPref = useCallback((identity: string, patch: Partial<RetentionPref>) => {
+    setRetentionPrefs((prev) => {
+      const cur: RetentionPref = prev[identity] ?? { weight: 1, must: false };
+      const merged: RetentionPref = { ...cur, ...patch };
+      const next = { ...prev };
+      if (merged.weight === 1 && !merged.must) delete next[identity];
+      else next[identity] = merged;
+      return next;
+    });
+  }, []);
+
+  const resetRetentionPrefs = useCallback(() => setRetentionPrefs({}), []);
 
   const onImportFile = (file: File): void => {
     const reader = new FileReader();
@@ -513,6 +534,11 @@ export default function App() {
               slotMark={slotMark}
               onSelectSlot={selectFreeSlot}
               onDismissSlotMark={() => setSlotMark(null)}
+              retentionLocation={retentionLocation}
+              onRetentionLocationChange={setRetentionLocation}
+              retentionPrefs={retentionPrefs}
+              onRetentionPrefChange={changeRetentionPref}
+              onRetentionReset={resetRetentionPrefs}
             />
           ) : (
             <div className="empty-hint">

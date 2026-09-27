@@ -6,6 +6,8 @@ import { detectConflicts, instanceId } from '../src/ical-engine/conflicts';
 import { diffInstances, instanceIdentity } from '../src/ical-engine/diff';
 import { normalizeCalendar } from '../src/ical-engine/normalizer';
 import { collectLocations, computeFreeWindows } from '../src/ical-engine/free-windows';
+import { computeRetentionPlan, type RetentionPref } from '../src/ical-engine/retention';
+import type { Instance } from '../src/ical-engine/types';
 import { dayLengthSec, dayStartUtcSec, wallToUtcSec } from '../src/utils/localtime';
 
 const ICS = `BEGIN:VCALENDAR
@@ -1174,6 +1176,179 @@ END:VCALENDAR
     assert.strictEqual(anchorBack.startUtc, Date.UTC(2026, 2, 3, 11) / 1000, 'disabling single falls back to range state');
     assert.ok(anchorBack.rangeOverride, 'range state referenced after single disabled');
     assert.ok(anchorBack.overrideDisabled, 'fallback marked as override-disabled');
+  }
+}
+
+// ================= 冲突保留方案 =================
+// 语义：非空 LOCATION + 正时长生效实例；UTC 半开区间无重叠子集包含全部必留项，
+// 最大化权重总和 → 同分保留更多实例 → 再按 uid#recurrenceKey 标识取字典序最小列表。
+
+function mkRet(uid: string, sh: number, sm: number, eh: number, em: number, loc = 'RL'): Instance {
+  const startUtc = Date.UTC(2026, 2, 10, sh, sm) / 1000;
+  const endUtc = Date.UTC(2026, 2, 10, eh, em) / 1000;
+  return {
+    key: startUtc,
+    recurrenceKey: startUtc,
+    seriesId: uid,
+    uid,
+    startUtc,
+    endUtc,
+    tzid: 'UTC',
+    utcOffsetSec: 0,
+    localClock: '09:00',
+    isAllDay: false,
+    summary: uid,
+    location: loc,
+    status: 'CONFIRMED',
+    source: 'single',
+    excluded: false,
+    cancelled: false,
+    overrideDisabled: false,
+    masterRange: { start: 1, end: 1 },
+    originLine: 1,
+  };
+}
+
+const retIds = (items: { identity: string }[]): string[] => items.map((i) => i.identity);
+const retId = (inst: Instance): string => `${inst.uid}#${inst.recurrenceKey}`;
+
+{
+  const A = mkRet('ra@x', 9, 0, 10, 0);
+  const B = mkRet('rb@x', 9, 30, 10, 30);
+  const C = mkRet('rc@x', 10, 0, 11, 0);
+
+  // 1) 带权调度：{A,C}=10 胜过 {B}=9；A 与 C 首尾相接（半开区间）不冲突
+  const prefs1: Record<string, RetentionPref> = {
+    [retId(A)]: { weight: 5, must: false },
+    [retId(B)]: { weight: 9, must: false },
+    [retId(C)]: { weight: 5, must: false },
+  };
+  const p1 = computeRetentionPlan([A, B, C], 'RL', prefs1);
+  assert.strictEqual(p1.participants.length, 3, 'three participants');
+  assert.deepStrictEqual(retIds(p1.kept), [retId(A), retId(C)], 'max weight keeps A+C');
+  assert.deepStrictEqual(retIds(p1.dropped), [retId(B)], 'B dropped');
+  assert.strictEqual(p1.totalWeight, 10, 'total weight 10');
+  assert.strictEqual(p1.mustConflicts.length, 0, 'no must conflicts');
+
+  // 2) 默认权重 1：无设置时相切实例全部保留
+  const p2 = computeRetentionPlan([A, C], 'RL', {});
+  assert.strictEqual(p2.kept.length, 2, 'touching instances both kept (half-open)');
+  assert.strictEqual(p2.totalWeight, 2, 'default weight 1 each');
+
+  // 3) 必留约束：低权重必留项挤掉高权重重叠项
+  const p3 = computeRetentionPlan([A, B, C], 'RL', {
+    [retId(A)]: { weight: 1, must: true },
+    [retId(B)]: { weight: 100, must: false },
+  });
+  assert.ok(retIds(p3.kept).includes(retId(A)), 'must-keep A included despite low weight');
+  assert.ok(!retIds(p3.kept).includes(retId(B)), 'high-weight overlapper dropped');
+  assert.ok(retIds(p3.kept).includes(retId(C)), 'non-overlapping C kept');
+
+  // 4) 必留项互相重叠：列出冲突对，无解，不输出方案
+  const p4 = computeRetentionPlan([A, B, C], 'RL', {
+    [retId(A)]: { weight: 1, must: true },
+    [retId(B)]: { weight: 1, must: true },
+  });
+  assert.strictEqual(p4.mustConflicts.length, 1, 'one must-conflict pair');
+  assert.deepStrictEqual(
+    [p4.mustConflicts[0].a.identity, p4.mustConflicts[0].b.identity],
+    [retId(A), retId(B)],
+    'conflict pair identifies both must items'
+  );
+  assert.strictEqual(p4.kept.length, 0, 'no kept list when unsatisfiable');
+  assert.strictEqual(p4.dropped.length, 0, 'no dropped list when unsatisfiable');
+  assert.strictEqual(p4.totalWeight, 0, 'no total weight when unsatisfiable');
+
+  // 5) 同分优先更多实例：{Y,Z}（权重 2，2 个）胜过 {X}（权重 2，1 个）
+  const X = mkRet('rx@x', 9, 0, 10, 0);
+  const Y = mkRet('ry@x', 9, 0, 9, 30);
+  const Z = mkRet('rz@x', 9, 30, 10, 0);
+  const p5 = computeRetentionPlan([X, Y, Z], 'RL', {
+    [retId(X)]: { weight: 2, must: false },
+  });
+  assert.deepStrictEqual(retIds(p5.kept), [retId(Y), retId(Z)], 'tie on weight -> more instances');
+  assert.strictEqual(p5.totalWeight, 2, 'tied total weight');
+
+  // 6) 权重与数量都相同：取标识字典序最小的列表
+  const LA = mkRet('la@x', 9, 0, 10, 0);
+  const LB = mkRet('lb@x', 9, 0, 10, 0);
+  const p6 = computeRetentionPlan([LB, LA], 'RL', {});
+  assert.deepStrictEqual(retIds(p6.kept), [retId(LA)], 'lexicographically smallest identity wins');
+
+  // 7) 零时长实例不参与；负权重按默认 1、小数向下取整
+  const Z0 = mkRet('rz0@x', 12, 0, 12, 0);
+  const FR = mkRet('rfrac@x', 13, 0, 14, 0);
+  const NG = mkRet('rneg@x', 15, 0, 16, 0);
+  const p7 = computeRetentionPlan([Z0, FR, NG], 'RL', {
+    [retId(FR)]: { weight: 2.9, must: false },
+    [retId(NG)]: { weight: -4, must: false },
+  });
+  assert.strictEqual(p7.participants.length, 2, 'zero-duration instance not a participant');
+  assert.strictEqual(p7.totalWeight, 2 + 1, 'fractional weight floored, negative falls back to 1');
+
+  // 8) 零权重实例在不冲突时仍保留（同分优先更多实例）
+  const p8 = computeRetentionPlan([A, C], 'RL', {
+    [retId(A)]: { weight: 0, must: false },
+  });
+  assert.strictEqual(p8.kept.length, 2, 'zero-weight instance kept when compatible');
+  assert.strictEqual(p8.totalWeight, 1, 'zero weight contributes nothing');
+
+  // 9) 消失项的设置不参与：不存在的必留标识不影响求解
+  const p9 = computeRetentionPlan([A, C], 'RL', {
+    'gone@x#123': { weight: 5, must: true },
+  });
+  assert.strictEqual(p9.mustConflicts.length, 0, 'vanished must entry ignored');
+  assert.strictEqual(p9.kept.length, 2, 'vanished entries do not distort the plan');
+
+  // 10) 已取消 / 已排除实例不参与；例外状态改变后重算，设置按标识保留
+  const RET_ICS = `BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Test-Retention//
+BEGIN:VEVENT
+UID:ret-daily@x
+SUMMARY:每日保留例会
+LOCATION:RL
+DTSTART:20260310T090000Z
+DTEND:20260310T100000Z
+RRULE:FREQ=DAILY;COUNT=3
+EXDATE:20260312T090000Z
+END:VEVENT
+BEGIN:VEVENT
+UID:ret-daily@x
+STATUS:CANCELLED
+DTSTART:20260311T090000Z
+DTEND:20260311T100000Z
+RECURRENCE-ID:20260311T090000Z
+END:VEVENT
+END:VCALENDAR
+`;
+  const rp = parseCalendar(RET_ICS);
+  assert.ok(!('fatal' in rp), 'retention sample parses');
+  if (!('fatal' in rp)) {
+    const range = { startUtc: Date.UTC(2026, 2, 9) / 1000, endUtc: Date.UTC(2026, 2, 14) / 1000 };
+    const exp = expandAll(rp.masters, range, { disabledOverrides: new Set(), editedRrule: {} });
+    assert.strictEqual(exp.instances.length, 1, 'only Mar 10 active (cancelled/excluded aside)');
+    const day10 = `${'ret-daily@x'}#${Date.UTC(2026, 2, 10, 9) / 1000}`;
+    const keptPrefs: Record<string, RetentionPref> = { [day10]: { weight: 7, must: true } };
+    const plan10 = computeRetentionPlan(exp.instances, 'RL', keptPrefs);
+    assert.strictEqual(plan10.participants.length, 1, 'cancelled/excluded not participants');
+    assert.strictEqual(plan10.totalWeight, 7, 'pref weight applied by identity');
+
+    // 停用 CANCELLED 例外 → 3/11 恢复生效，方案立即重算；3/10 的设置按标识保留
+    const master = rp.masters.find((m) => m.uid === 'ret-daily@x')!;
+    const cancelOv = master.overrides.find((o) => o.cancelled)!;
+    const exp2 = expandAll(rp.masters, range, {
+      disabledOverrides: new Set([cancelOv.id]),
+      editedRrule: {},
+    });
+    assert.strictEqual(exp2.instances.length, 2, 'Mar 11 restored after disabling cancellation');
+    const plan11 = computeRetentionPlan(exp2.instances, 'RL', keptPrefs);
+    assert.strictEqual(plan11.participants.length, 2, 'recomputed with restored instance');
+    assert.strictEqual(plan11.totalWeight, 7 + 1, 'kept pref survives recompute; new instance defaults to 1');
+    assert.ok(
+      plan11.kept.every((k) => k.inst.startUtc < Date.UTC(2026, 2, 12) / 1000),
+      'excluded Mar 12 still absent'
+    );
   }
 }
 

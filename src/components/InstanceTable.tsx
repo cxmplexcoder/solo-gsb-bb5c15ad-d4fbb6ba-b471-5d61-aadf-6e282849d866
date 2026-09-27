@@ -3,11 +3,13 @@ import type { Instance } from '../ical-engine/types';
 import { detectConflicts, instanceId } from '../ical-engine/conflicts';
 import type { InstanceChange } from '../ical-engine/diff';
 import type { FreeSlot } from '../ical-engine/free-windows';
+import type { RetentionPref } from '../ical-engine/retention';
 import { formatWall, formatOffset } from '../utils/format';
 import { ChangeImpact } from './ChangeImpact';
 import { FreeWindows } from './FreeWindows';
+import { RetentionPanel } from './RetentionPanel';
 
-export type AuditTab = 'visible' | 'cancelled' | 'excluded' | 'impact' | 'free';
+export type AuditTab = 'visible' | 'cancelled' | 'excluded' | 'impact' | 'free' | 'retention';
 
 /** 点击空闲窗口后，在生效表定位空档前后相邻事件的标记 */
 export interface SlotMark {
@@ -43,6 +45,12 @@ interface InstanceTableProps {
   slotMark: SlotMark | null;
   onSelectSlot: (slot: FreeSlot, tzid: string) => void;
   onDismissSlotMark: () => void;
+  /** 冲突保留方案页签参数 */
+  retentionLocation: string;
+  onRetentionLocationChange: (loc: string) => void;
+  retentionPrefs: Record<string, RetentionPref>;
+  onRetentionPrefChange: (identity: string, patch: Partial<RetentionPref>) => void;
+  onRetentionReset: () => void;
 }
 
 const SOURCE_LABEL: Record<Instance['source'], string> = {
@@ -71,6 +79,11 @@ export function InstanceTable({
   slotMark,
   onSelectSlot,
   onDismissSlotMark,
+  retentionLocation,
+  onRetentionLocationChange,
+  retentionPrefs,
+  onRetentionPrefChange,
+  onRetentionReset,
 }: InstanceTableProps) {
   const [locFilter, setLocFilter] = useState('');
   const [onlyConflicts, setOnlyConflicts] = useState(false);
@@ -86,7 +99,7 @@ export function InstanceTable({
   }, [tab, instances, cancelled, excluded]);
 
   const filteredRows = useMemo(() => {
-    if (tab === 'impact' || tab === 'free') return [];
+    if (tab === 'impact' || tab === 'free' || tab === 'retention') return [];
     const q = locFilter.trim().toLowerCase();
     return rows.filter((i) => {
       if (q && !i.location.toLowerCase().includes(q) && !i.summary.toLowerCase().includes(q)) {
@@ -145,6 +158,12 @@ export function InstanceTable({
         <button className={tab === 'free' ? 'active' : ''} onClick={() => onTabChange('free')}>
           空闲窗口
         </button>
+        <button
+          className={tab === 'retention' ? 'active' : ''}
+          onClick={() => onTabChange('retention')}
+        >
+          冲突保留
+        </button>
         <button className={tab === 'impact' ? 'active' : ''} onClick={() => onTabChange('impact')}>
           变更影响{changes.length > 0 ? `（${changes.length}）` : ''}
         </button>
@@ -170,6 +189,17 @@ export function InstanceTable({
             onTabChange('visible');
             onSelect(inst);
           }}
+        />
+      ) : tab === 'retention' ? (
+        <RetentionPanel
+          instances={instances}
+          location={retentionLocation}
+          onLocationChange={onRetentionLocationChange}
+          prefs={retentionPrefs}
+          onPrefChange={onRetentionPrefChange}
+          onResetPrefs={onRetentionReset}
+          selectedKey={selectedKey}
+          onSelect={onSelect}
         />
       ) : (
         <>

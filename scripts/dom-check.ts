@@ -141,6 +141,85 @@ if (!container.textContent?.includes('当前范围内没有有效改动')) {
 }
 console.log('✓ 重新启用范围例外后差异清空（回到范围状态）');
 
+// 9) 冲突保留方案：选择 LOCATION → 权重/必留 → 方案与无解路径
+const retentionTab = byText('.tabs button', '冲突保留') as HTMLElement;
+if (!retentionTab) throw new Error('冲突保留 页签未渲染');
+await act(async () => {
+  retentionTab.click();
+});
+if (!container.textContent?.includes('选择 LOCATION 后')) {
+  throw new Error('未选 LOCATION 时应显示空状态提示');
+}
+console.log('✓ 冲突保留页签渲染空状态');
+
+const retSelect = container.querySelector('.free-controls select') as HTMLSelectElement;
+if (!retSelect) throw new Error('找不到保留方案 LOCATION 下拉');
+const selectSetter = Object.getOwnPropertyDescriptor(
+  dom.window.HTMLSelectElement.prototype,
+  'value'
+)!.set!;
+await act(async () => {
+  selectSetter.call(retSelect, '会议室 A');
+  retSelect.dispatchEvent(new dom.window.Event('change', { bubbles: true }));
+});
+const retRows = () => container.querySelectorAll('tr.ret-row');
+if (retRows().length === 0) throw new Error('选择 LOCATION 后应列出参与实例');
+const dropBadges = () => container.querySelectorAll('.ret-badge.drop');
+const keepBadges = () => container.querySelectorAll('.ret-badge.keep');
+// 示例中会议室 A 有 4 个站会因字典序规则被舍弃（3/4、3/10、3/11、3/18）
+if (dropBadges().length !== 4) throw new Error(`默认方案应舍弃 4 个实例，实际 ${dropBadges().length}`);
+if (keepBadges().length !== retRows().length - 4) throw new Error('保留数应为参与数减舍弃数');
+if (!container.textContent?.includes('总权重')) throw new Error('应展示总权重');
+console.log(`✓ 默认方案：参与 ${retRows().length}，保留 ${keepBadges().length}，舍弃 ${dropBadges().length}`);
+
+// 勾选被舍弃实例的必留 → 立即重算，该实例转为保留并标注必留
+const firstDropped = dropBadges()[0].closest('tr') as HTMLElement;
+const mustCb = firstDropped.querySelector('input[type="checkbox"]') as HTMLInputElement;
+await act(async () => {
+  mustCb.click();
+});
+if (!firstDropped.querySelector('.ret-badge.keep')) throw new Error('必留实例应转为保留');
+if (!firstDropped.textContent?.includes('必留')) throw new Error('必留实例应标注「必留」');
+console.log('✓ 必留标记立即重算：被舍弃实例转为保留');
+
+// 再把与其重叠的实例也设为必留 → 冲突对 + 无解，不输出方案
+const secondDropped = container.querySelector('tr.ret-dropped') as HTMLElement;
+if (!secondDropped) throw new Error('应存在被必留挤掉的实例');
+const mustCb2 = secondDropped.querySelector('input[type="checkbox"]') as HTMLInputElement;
+await act(async () => {
+  mustCb2.click();
+});
+if (!container.textContent?.includes('无解')) throw new Error('必留互相重叠时应提示无解');
+if (!container.textContent?.includes('冲突对')) throw new Error('应列出必留冲突对');
+if (container.querySelector('.ret-badge.keep')) throw new Error('无解时不应输出保留方案');
+console.log('✓ 必留冲突对展示并无解（不输出方案）');
+
+// 取消第二个必留 → 方案恢复
+await act(async () => {
+  mustCb2.click();
+});
+if (container.textContent?.includes('无解')) throw new Error('取消必留后应恢复有解');
+if (!container.querySelector('.ret-badge.keep')) throw new Error('恢复后应重新输出保留方案');
+console.log('✓ 取消必留后方案立即恢复');
+
+// 点击实例行 → 沿用源码定位（行选中）
+const firstRetRow = retRows()[0] as HTMLElement;
+await act(async () => {
+  firstRetRow.click();
+});
+if (!container.querySelector('tr.ret-row.selected')) throw new Error('点击实例行应选中并定位源码');
+console.log('✓ 点击保留方案实例联动源码定位');
+
+// 重新解析（载入示例）→ 权重/必留设置与 LOCATION 选择重置
+const loadSampleBtn = byText('button', '载入示例') as HTMLElement;
+await act(async () => {
+  loadSampleBtn.click();
+});
+if (!container.textContent?.includes('选择 LOCATION 后')) {
+  throw new Error('重新解析后保留方案设置应重置');
+}
+console.log('✓ 重新解析后保留方案设置重置');
+
 root.unmount();
 console.log('✓ DOM 集成验证全部通过');
 // jsdom 的定时器会让事件循环保持存活，显式退出
