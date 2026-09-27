@@ -1,11 +1,9 @@
 import { JSDOM } from 'jsdom';
-import React from 'react';
-import { createRoot } from 'react-dom/client';
-import { act } from 'react-dom/test-utils';
-import App from '../src/App';
 
 ;(async () => {
 // 临时 DOM 集成验证：挂载 App，切换到“变更影响”页签，验证空状态 / 停用例外后的差异行 / 点击联动。
+// 注意：必须先装好 jsdom 全局环境，再动态加载 React——react-dom 在模块初始化时
+// 依据 canUseDOM 判定 isInputEventSupported，否则文本/数字输入的 onChange 不响应 input 事件。
 
 const dom = new JSDOM('<!doctype html><html><body><div id="root"></div></body></html>', {
   url: 'http://localhost/',
@@ -20,6 +18,11 @@ const dom = new JSDOM('<!doctype html><html><body><div id="root"></div></body></
 (globalThis as any).MouseEvent = dom.window.MouseEvent;
 (globalThis as any).getComputedStyle = dom.window.getComputedStyle.bind(dom.window);
 (dom.window.HTMLElement.prototype as any).scrollIntoView = () => {};
+
+const React = (await import('react')).default;
+const { createRoot } = await import('react-dom/client');
+const { act } = await import('react-dom/test-utils');
+const { default: App } = await import('../src/App');
 
 const container = document.getElementById('root')!;
 const root = createRoot(container);
@@ -140,6 +143,102 @@ if (!container.textContent?.includes('当前范围内没有有效改动')) {
   throw new Error('重新启用范围例外后差异应清空');
 }
 console.log('✓ 重新启用范围例外后差异清空（回到范围状态）');
+
+// 9) 冲突保留方案：选 LOCATION → 出方案；全设必留 → 无解；取消 → 恢复；点击行联动定位
+const keepTab = byText('.tabs button', '冲突保留方案') as HTMLElement;
+if (!keepTab) throw new Error('冲突保留方案 页签未渲染');
+await act(async () => {
+  keepTab.click();
+});
+if (!container.textContent?.includes('选择 LOCATION 后')) {
+  throw new Error('未选 LOCATION 时应显示空状态');
+}
+console.log('✓ 冲突保留方案页签空状态');
+
+const keepSelect = container.querySelector('.free-controls select') as HTMLSelectElement;
+if (!keepSelect) throw new Error('找不到 LOCATION 下拉');
+const setSelectValue = (el: HTMLSelectElement, value: string): void => {
+  const setter = Object.getOwnPropertyDescriptor(
+    (dom.window as any).HTMLSelectElement.prototype,
+    'value'
+  )!.set!;
+  setter.call(el, value);
+  el.dispatchEvent(new dom.window.Event('change', { bubbles: true }));
+};
+await act(async () => {
+  setSelectValue(keepSelect, '会议室 A');
+});
+if (!container.textContent?.includes('总权重')) throw new Error('应显示总权重横幅');
+if (!container.textContent?.includes('参与实例设置')) throw new Error('应显示参与实例设置表');
+const keptRows = container.querySelectorAll('.keep-row.kept');
+const discardedRows = container.querySelectorAll('.keep-row.discarded');
+if (keptRows.length === 0 || discardedRows.length === 0) {
+  throw new Error('会议室 A 应同时存在保留与舍弃实例（示例含同地点冲突）');
+}
+console.log(`✓ 保留方案已计算：保留 ${keptRows.length} / 舍弃 ${discardedRows.length}`);
+
+// 修改权重（第一个参与实例设为 7）→ 总权重相应增加
+const totalWeightOf = (): number => {
+  const el = container.querySelector('.keep-banner .keep-total');
+  return el ? Number(el.textContent) : Number.NaN;
+};
+const w0 = totalWeightOf();
+const weightInput = container.querySelector('.keep-weight-input') as HTMLInputElement;
+if (!weightInput) throw new Error('找不到权重输入框');
+await act(async () => {
+  const setter = Object.getOwnPropertyDescriptor(
+    (dom.window as any).HTMLInputElement.prototype,
+    'value'
+  )!.set!;
+  setter.call(weightInput, '7');
+  weightInput.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
+});
+if (totalWeightOf() !== w0 + 6) {
+  throw new Error(`权重 1→7 应使总权重 +6（前 ${w0} 后 ${totalWeightOf()}）`);
+}
+console.log('✓ 权重编辑实时重算（总权重 +6）');
+
+// 全部设为必留 → 必留项互相重叠 → 无解
+const mustCbs = () =>
+  [...container.querySelectorAll('.keep-table input[type="checkbox"]')] as HTMLInputElement[];
+const mustTotal = mustCbs().length;
+if (mustTotal === 0) throw new Error('参与实例设置表应有必留勾选框');
+for (let i = 0; i < mustTotal; i++) {
+  await act(async () => {
+    mustCbs()[i].click();
+  });
+}
+if (!container.textContent?.includes('必留项互相重叠，无解')) {
+  throw new Error('全部必留（含重叠实例）应判定无解');
+}
+if (container.querySelectorAll('.keep-pair').length === 0) {
+  throw new Error('无解时应列出必留冲突对');
+}
+if (container.querySelector('.keep-banner')) {
+  throw new Error('无解时不应输出方案横幅');
+}
+console.log(`✓ 必留项互相重叠：列出 ${container.querySelectorAll('.keep-pair').length} 对冲突，未输出方案`);
+
+// 取消全部必留 → 恢复有解
+for (let i = 0; i < mustTotal; i++) {
+  await act(async () => {
+    mustCbs()[i].click();
+  });
+}
+if (!container.textContent?.includes('总权重')) throw new Error('取消必留后应恢复方案输出');
+console.log('✓ 取消必留后立即重算恢复方案');
+
+// 点击保留行 → 行选中并联动源码定位（停留在本页签）
+await act(async () => {
+  (container.querySelector('.keep-row.kept') as HTMLElement).click();
+});
+if (!container.querySelector('.keep-row.selected')) {
+  throw new Error('点击保留行后应高亮选中');
+}
+if (!keepTab.classList.contains('active')) {
+  throw new Error('点击保留行应停留在冲突保留方案页签');
+}
+console.log('✓ 点击保留行联动源码定位（不切换页签）');
 
 root.unmount();
 console.log('✓ DOM 集成验证全部通过');

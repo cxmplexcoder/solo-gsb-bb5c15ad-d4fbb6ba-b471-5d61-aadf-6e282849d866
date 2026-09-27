@@ -3,11 +3,13 @@ import type { Instance } from '../ical-engine/types';
 import { detectConflicts, instanceId } from '../ical-engine/conflicts';
 import type { InstanceChange } from '../ical-engine/diff';
 import type { FreeSlot } from '../ical-engine/free-windows';
+import type { KeepSetting } from '../ical-engine/keep-plan';
 import { formatWall, formatOffset } from '../utils/format';
 import { ChangeImpact } from './ChangeImpact';
 import { FreeWindows } from './FreeWindows';
+import { KeepPlan } from './KeepPlan';
 
-export type AuditTab = 'visible' | 'cancelled' | 'excluded' | 'impact' | 'free';
+export type AuditTab = 'visible' | 'cancelled' | 'excluded' | 'impact' | 'free' | 'keep';
 
 /** 点击空闲窗口后，在生效表定位空档前后相邻事件的标记 */
 export interface SlotMark {
@@ -74,6 +76,9 @@ export function InstanceTable({
 }: InstanceTableProps) {
   const [locFilter, setLocFilter] = useState('');
   const [onlyConflicts, setOnlyConflicts] = useState(false);
+  /** 冲突保留方案：LOCATION 与 权重/必留设置（按身份保留，页签切换不丢失） */
+  const [keepLocation, setKeepLocation] = useState('');
+  const [keepSettings, setKeepSettings] = useState<Record<string, KeepSetting>>({});
   const rowRefs = useRef<Map<string, HTMLTableRowElement>>(new Map());
 
   const conflicts = useMemo(() => detectConflicts(instances), [instances]);
@@ -86,7 +91,7 @@ export function InstanceTable({
   }, [tab, instances, cancelled, excluded]);
 
   const filteredRows = useMemo(() => {
-    if (tab === 'impact' || tab === 'free') return [];
+    if (tab === 'impact' || tab === 'free' || tab === 'keep') return [];
     const q = locFilter.trim().toLowerCase();
     return rows.filter((i) => {
       if (q && !i.location.toLowerCase().includes(q) && !i.summary.toLowerCase().includes(q)) {
@@ -145,6 +150,9 @@ export function InstanceTable({
         <button className={tab === 'free' ? 'active' : ''} onClick={() => onTabChange('free')}>
           空闲窗口
         </button>
+        <button className={tab === 'keep' ? 'active' : ''} onClick={() => onTabChange('keep')}>
+          冲突保留方案
+        </button>
         <button className={tab === 'impact' ? 'active' : ''} onClick={() => onTabChange('impact')}>
           变更影响{changes.length > 0 ? `（${changes.length}）` : ''}
         </button>
@@ -170,6 +178,16 @@ export function InstanceTable({
             onTabChange('visible');
             onSelect(inst);
           }}
+        />
+      ) : tab === 'keep' ? (
+        <KeepPlan
+          instances={instances}
+          location={keepLocation}
+          onLocationChange={setKeepLocation}
+          settings={keepSettings}
+          onSettingsChange={setKeepSettings}
+          selectedKey={selectedKey}
+          onSelectInstance={onSelect}
         />
       ) : (
         <>

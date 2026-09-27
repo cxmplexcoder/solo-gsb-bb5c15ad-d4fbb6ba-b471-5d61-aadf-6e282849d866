@@ -6,6 +6,7 @@ import { detectConflicts, instanceId } from '../src/ical-engine/conflicts';
 import { diffInstances, instanceIdentity } from '../src/ical-engine/diff';
 import { normalizeCalendar } from '../src/ical-engine/normalizer';
 import { collectLocations, computeFreeWindows } from '../src/ical-engine/free-windows';
+import { computeKeepPlan } from '../src/ical-engine/keep-plan';
 import { dayLengthSec, dayStartUtcSec, wallToUtcSec } from '../src/utils/localtime';
 
 const ICS = `BEGIN:VCALENDAR
@@ -1174,6 +1175,242 @@ END:VCALENDAR
     assert.strictEqual(anchorBack.startUtc, Date.UTC(2026, 2, 3, 11) / 1000, 'disabling single falls back to range state');
     assert.ok(anchorBack.rangeOverride, 'range state referenced after single disabled');
     assert.ok(anchorBack.overrideDisabled, 'fallback marked as override-disabled');
+  }
+}
+
+// ================= 冲突保留方案（加权区间调度 + 必留约束） =================
+// 时间线（UTC，2026-03-05，Room-K）：
+//   Daily 08:00–08:30（3/4、3/5 两天；3/6 EXDATE、3/7 CANCELLED 均不参与）
+//   A 09:00–10:00   B 09:30–10:30   C 10:00–11:00（A/C 相切，B 与两者重叠）
+//   X 12:00–13:00   Y 12:00–12:30   Z 12:30–13:00（X 与 Y/Z 重叠，Y/Z 相切）
+//   P 14:00–15:00（uid kp-zz） Q 14:00–15:00（uid kp-aa，字典序更小）
+//   Zero 16:00（零时长，不参与）  Other 在 Room-L（不参与）
+const KP_ICS = `BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Test-KeepPlan//
+BEGIN:VEVENT
+UID:kp-a@x
+SUMMARY:A
+LOCATION:Room-K
+DTSTART:20260305T090000Z
+DTEND:20260305T100000Z
+END:VEVENT
+BEGIN:VEVENT
+UID:kp-b@x
+SUMMARY:B
+LOCATION:Room-K
+DTSTART:20260305T093000Z
+DTEND:20260305T103000Z
+END:VEVENT
+BEGIN:VEVENT
+UID:kp-c@x
+SUMMARY:C
+LOCATION:Room-K
+DTSTART:20260305T100000Z
+DTEND:20260305T110000Z
+END:VEVENT
+BEGIN:VEVENT
+UID:kp-x@x
+SUMMARY:X
+LOCATION:Room-K
+DTSTART:20260305T120000Z
+DTEND:20260305T130000Z
+END:VEVENT
+BEGIN:VEVENT
+UID:kp-y@x
+SUMMARY:Y
+LOCATION:Room-K
+DTSTART:20260305T120000Z
+DTEND:20260305T123000Z
+END:VEVENT
+BEGIN:VEVENT
+UID:kp-z@x
+SUMMARY:Z
+LOCATION:Room-K
+DTSTART:20260305T123000Z
+DTEND:20260305T130000Z
+END:VEVENT
+BEGIN:VEVENT
+UID:kp-zz@x
+SUMMARY:P
+LOCATION:Room-K
+DTSTART:20260305T140000Z
+DTEND:20260305T150000Z
+END:VEVENT
+BEGIN:VEVENT
+UID:kp-aa@x
+SUMMARY:Q
+LOCATION:Room-K
+DTSTART:20260305T140000Z
+DTEND:20260305T150000Z
+END:VEVENT
+BEGIN:VEVENT
+UID:kp-zero@x
+SUMMARY:Zero
+LOCATION:Room-K
+DTSTART:20260305T160000Z
+END:VEVENT
+BEGIN:VEVENT
+UID:kp-other@x
+SUMMARY:Other
+LOCATION:Room-L
+DTSTART:20260305T090000Z
+DTEND:20260305T100000Z
+END:VEVENT
+BEGIN:VEVENT
+UID:kp-daily@x
+SUMMARY:Daily
+LOCATION:Room-K
+DTSTART:20260304T080000Z
+DTEND:20260304T083000Z
+RRULE:FREQ=DAILY;COUNT=4
+EXDATE:20260306T080000Z
+END:VEVENT
+BEGIN:VEVENT
+UID:kp-daily@x
+STATUS:CANCELLED
+SUMMARY:Daily cancelled
+DTSTART:20260307T080000Z
+DTEND:20260307T083000Z
+RECURRENCE-ID:20260307T080000Z
+END:VEVENT
+END:VCALENDAR
+`;
+{
+  const kpParsed = parseCalendar(KP_ICS);
+  assert.ok(!('fatal' in kpParsed), 'keep-plan sample parses');
+  if (!('fatal' in kpParsed)) {
+    const kpRange = { startUtc: Date.UTC(2026, 2, 1) / 1000, endUtc: Date.UTC(2026, 3, 1) / 1000 };
+    const kpExp = expandAll(kpParsed.masters, kpRange, {
+      disabledOverrides: new Set(),
+      editedRrule: {},
+    });
+    const idOf = (uid: string, key: number) => `${uid}#${key}`;
+    const A = idOf('kp-a@x', utc(2026, 2, 5, 9));
+    const B = idOf('kp-b@x', utc(2026, 2, 5, 9, 30));
+    const C = idOf('kp-c@x', utc(2026, 2, 5, 10));
+    const X = idOf('kp-x@x', utc(2026, 2, 5, 12));
+    const Y = idOf('kp-y@x', utc(2026, 2, 5, 12));
+    const Z = idOf('kp-z@x', utc(2026, 2, 5, 12, 30));
+    const P = idOf('kp-zz@x', utc(2026, 2, 5, 14));
+    const Q = idOf('kp-aa@x', utc(2026, 2, 5, 14));
+    const D4 = idOf('kp-daily@x', utc(2026, 2, 4, 8));
+    const D5 = idOf('kp-daily@x', utc(2026, 2, 5, 8));
+
+    // K1) 参与集：正时长 + 同 LOCATION；取消/排除/零时长/别地点不参与
+    const plan0 = computeKeepPlan(kpExp.instances, 'Room-K', {});
+    assert.strictEqual(plan0.status, 'ok');
+    assert.strictEqual(plan0.participants.length, 10, 'ten positive-duration Room-K participants');
+    const pids = plan0.participants.map((p) => p.identity);
+    assert.ok(!pids.some((id) => id.startsWith('kp-zero@x')), 'zero-duration not participant');
+    assert.ok(!pids.some((id) => id.startsWith('kp-other@x')), 'other location not participant');
+    assert.ok(
+      !pids.includes(idOf('kp-daily@x', utc(2026, 2, 6, 8))) &&
+        !pids.includes(idOf('kp-daily@x', utc(2026, 2, 7, 8))),
+      'excluded / cancelled occurrences not participants'
+    );
+    assert.ok(
+      plan0.participants.every((p) => p.weight === 1 && !p.must),
+      'default weight 1, default not must'
+    );
+
+    // K2) 默认全 1：A+C（相切可共存）、Y+Z、Q（字典序小）入选
+    const kept0 = plan0.kept.map((p) => p.identity).sort();
+    assert.deepStrictEqual(
+      kept0,
+      [A, C, D4, D5, Q, Y, Z].sort(),
+      'default plan keeps A+C, Y+Z, lex-smaller Q, both dailies'
+    );
+    assert.deepStrictEqual(
+      plan0.discarded.map((p) => p.identity).sort(),
+      [B, P, X].sort(),
+      'B/X/P discarded'
+    );
+    assert.strictEqual(plan0.totalWeight, 7, 'total weight 7');
+
+    // K3) 权重决胜：B=3 时单留 B（3 > A+C=2）
+    const planB = computeKeepPlan(kpExp.instances, 'Room-K', { [B]: { weight: 3, must: false } });
+    const keptB = planB.kept.map((p) => p.identity);
+    assert.ok(keptB.includes(B) && !keptB.includes(A) && !keptB.includes(C), 'heavy B wins over A+C');
+    assert.strictEqual(planB.totalWeight, 8, 'total weight 8 with heavy B');
+
+    // K4) 数量决胜：X=2 时 {X}=w2c1 vs {Y,Z}=w2c2 → 留 Y+Z；X=3 时只留 X
+    const planX2 = computeKeepPlan(kpExp.instances, 'Room-K', { [X]: { weight: 2, must: false } });
+    const keptX2 = planX2.kept.map((p) => p.identity);
+    assert.ok(keptX2.includes(Y) && keptX2.includes(Z) && !keptX2.includes(X), 'count tie-break keeps more instances');
+    const planX3 = computeKeepPlan(kpExp.instances, 'Room-K', { [X]: { weight: 3, must: false } });
+    const keptX3 = planX3.kept.map((p) => p.identity);
+    assert.ok(keptX3.includes(X) && !keptX3.includes(Y) && !keptX3.includes(Z), 'heavier X wins alone');
+
+    // K5) 字典序决胜：Q（kp-aa）与 P（kp-zz）区间相同、权重相同 → 留 Q
+    assert.ok(kept0.includes(Q) && !kept0.includes(P), 'lexicographically smaller identity kept');
+
+    // K6) 必留：A 必留 → B 被阻挡舍弃，相切的 C 仍可保留
+    const planMustA = computeKeepPlan(kpExp.instances, 'Room-K', { [A]: { weight: 1, must: true } });
+    const keptMA = planMustA.kept.map((p) => p.identity);
+    assert.ok(keptMA.includes(A) && keptMA.includes(C), 'must A kept, abutting C still kept');
+    assert.ok(!keptMA.includes(B), 'overlapping B discarded');
+    assert.ok(planMustA.blockedByMust.has(B), 'B flagged blocked-by-must');
+    assert.strictEqual(planMustA.totalWeight, 7, 'must plan total weight 7');
+
+    // K7) 必留项互相重叠 → 无解，列出冲突对，不输出方案
+    const planBad = computeKeepPlan(kpExp.instances, 'Room-K', {
+      [A]: { weight: 1, must: true },
+      [B]: { weight: 1, must: true },
+    });
+    assert.strictEqual(planBad.status, 'infeasible', 'overlapping musts infeasible');
+    assert.strictEqual(planBad.kept.length + planBad.discarded.length, 0, 'no plan output when infeasible');
+    assert.strictEqual(planBad.mustPairs.length, 1, 'one must conflict pair');
+    assert.deepStrictEqual(
+      [planBad.mustPairs[0].a.identity, planBad.mustPairs[0].b.identity],
+      [A, B],
+      'conflict pair is A×B'
+    );
+
+    // K8) 相切的必留项不算重叠：A、C 同时必留有解且都保留
+    const planMustAC = computeKeepPlan(kpExp.instances, 'Room-K', {
+      [A]: { weight: 1, must: true },
+      [C]: { weight: 1, must: true },
+    });
+    assert.strictEqual(planMustAC.status, 'ok', 'abutting musts feasible');
+    const keptMAC = planMustAC.kept.map((p) => p.identity);
+    assert.ok(keptMAC.includes(A) && keptMAC.includes(C), 'both abutting musts kept');
+
+    // K9) 零权重：必留 X（权重 0）仍保留且不计权重；Y/Z 被阻挡
+    const planX0 = computeKeepPlan(kpExp.instances, 'Room-K', { [X]: { weight: 0, must: true } });
+    const keptX0 = planX0.kept.map((p) => p.identity);
+    assert.ok(keptX0.includes(X), 'zero-weight must still kept');
+    assert.ok(!keptX0.includes(Y) && !keptX0.includes(Z), 'Y/Z blocked by must X');
+    assert.ok(planX0.blockedByMust.has(Y) && planX0.blockedByMust.has(Z), 'Y/Z flagged blocked');
+    assert.strictEqual(
+      planX0.kept.find((p) => p.identity === X)!.weight,
+      0,
+      'zero weight honored'
+    );
+
+    // K10) 权重清洗：负数回退默认 1，小数取整
+    const planSan = computeKeepPlan(kpExp.instances, 'Room-K', {
+      [A]: { weight: -5, must: false },
+      [B]: { weight: 2.7, must: false },
+    });
+    assert.strictEqual(planSan.participants.find((p) => p.identity === A)!.weight, 1, 'negative weight falls back to 1');
+    assert.strictEqual(planSan.participants.find((p) => p.identity === B)!.weight, 2, 'fractional weight floored');
+
+    // K11) 消失项的设置不参与：无关身份不影响求解
+    const planGone = computeKeepPlan(kpExp.instances, 'Room-K', {
+      'gone@x#123': { weight: 99, must: true },
+    });
+    assert.strictEqual(planGone.status, 'ok', 'vanished must setting ignored');
+    assert.strictEqual(planGone.totalWeight, plan0.totalWeight, 'vanished settings do not change plan');
+
+    // K12) 零权重自由实例按“同分留更多”被打包保留：A/B/C 全 0 → 留 A+C
+    const planAllZero = computeKeepPlan(kpExp.instances, 'Room-K', {
+      [A]: { weight: 0, must: false },
+      [B]: { weight: 0, must: false },
+      [C]: { weight: 0, must: false },
+    });
+    const keptAZ = planAllZero.kept.map((p) => p.identity);
+    assert.ok(keptAZ.includes(A) && keptAZ.includes(C) && !keptAZ.includes(B), 'zero-weight: max count packing keeps A+C');
   }
 }
 
